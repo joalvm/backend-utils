@@ -1,0 +1,38 @@
+{
+    "name": "joalvm/backend-utils",
+    "description": "Laravel Backend API utils",
+    "type": "library",
+    "keywords": [
+        "laravel",
+        "backend",
+        "api",
+        "utils"
+    ],
+    "license": "MIT",
+    "authors": [{
+        "name": "Alejandro Vilchez",
+        "email": "joalvm@gmail.com"
+    }],
+    "prefer-stable": true,
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "Joalvm\\Utils\\": "src/"
+        },
+        "files": [
+            "src/Helpers/casts.php",
+            "src/Helpers/utils.php"
+        ]
+    },
+    "require": {
+        "php": ">=7.3",
+        "illuminate/support": "^7.30 || ^8.47",
+        "illuminate/database": "^7.30 || ^8.47",
+        "illuminate/validation": "^7.30 || ^8.47",
+        "illuminate/http": "^7.30 || ^8.47"
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "^3.6",
+        "friendsofphp/php-cs-fixer": "^3.0"
+    }
+}
