@@ -1,10 +1,8 @@
 <?xml version="1.0"?>
-<ruleset name="Invian International">
-    <description>Invian Mercadooh Service</description>
+<ruleset name="Backend-Utils">
+    <description>Backend Utilities Project</description>
 
     <file>src/</file>
-    <file>database/seeds/</file>
-    <file>database/Resources.php</file>
 
     <exclude-pattern>**/vendor/**</exclude-pattern>
     <exclude-pattern>./php_cs.php</exclude-pattern>

@@ -1,5 +1,6 @@
 {
     "name": "joalvm/backend-utils",
+    "version": "0.1.2",
     "description": "Laravel Backend API utils",
     "type": "library",
     "keywords": [
@@ -9,30 +10,47 @@
         "utils"
     ],
     "license": "MIT",
-    "authors": [{
-        "name": "Alejandro Vilchez",
-        "email": "joalvm@gmail.com"
-    }],
+    "authors": [
+        {
+            "name": "Alejandro Vilchez",
+            "email": "joalvm@gmail.com"
+        }
+    ],
     "prefer-stable": true,
     "minimum-stability": "dev",
-    "autoload": {
-        "psr-4": {
-            "Joalvm\\Utils\\": "src/"
-        },
-        "files": [
-            "src/Helpers/casts.php",
-            "src/Helpers/utils.php"
-        ]
-    },
     "require": {
         "php": ">=7.3",
         "illuminate/support": "^7.30 || ^8.47",
         "illuminate/database": "^7.30 || ^8.47",
         "illuminate/validation": "^7.30 || ^8.47",
-        "illuminate/http": "^7.30 || ^8.47"
+        "illuminate/http": "^7.30 || ^8.47",
+        "symfony/polyfill-php81": "^1.23",
+        "symfony/polyfill-php80": "^1.23",
+        "illuminate/pagination": "^8.70",
+        "symfony/property-access": "^5.3"
     },
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.6",
-        "friendsofphp/php-cs-fixer": "^3.0"
+        "friendsofphp/php-cs-fixer": "^3.0",
+        "phpunit/phpunit": "^9.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Joalvm\\Utils\\": "src/"
+        },
+        "files": [
+            "src/Helpers/utils.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Joalvm\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "tests": "phpunit",
+        "phpcs": "phpcs --standard=ruleset.xml",
+        "phpcs-fixer": "phpcbf --standard=ruleset.xml --report=diff",
+        "cs-fixer": "php-cs-fixer fix . --using-cache=no --config=.php_cs.php"
     }
 }

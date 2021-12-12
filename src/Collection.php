@@ -2,69 +2,57 @@
 
 namespace Joalvm\Utils;
 
-use Closure;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection as BaseCollection;
+use Joalvm\Utils\Schema\Schema;
 
 class Collection extends BaseCollection
 {
     /**
      * Contiene la estructura para cada item de la colección.
      *
-     * @var array
+     * @var Schema
      */
-    protected $schema = [];
+    protected $schema;
 
-    /**
-     * @var null|Closure
-     */
-    protected $casts;
+    protected $paginationInfo = [];
 
     private $isPaginate = false;
 
-    private $paginate;
-
     /**
      * @param BaseCollection|LengthAwarePaginator $items
-     * @param null|Closure                        $casts
+     * @param Schema                              $schema
      */
-    public function __construct($items, array $schema = [], $casts = null)
+    public function __construct($items, Schema $schema = null)
     {
-        $this->schema = $schema;
-        $this->casts = $casts;
-
         $this->isPaginate = $items instanceof LengthAwarePaginator;
 
-        parent::__construct(
-            $this->isPaginate
-                ? $items->items()
-                : (is_array($items) ? $items : $items->items)
-        );
-
         if ($this->isPaginate) {
-            $this->paginate = $items->setCollection(collect());
+            $this->assignPaginationInfo($items);
+            parent::__construct($items->items());
+        } elseif ($items instanceof BaseCollection) {
+            parent::__construct($items->all());
+        } elseif (is_array($items)) {
+            parent::__construct($items);
         }
+
+        $this->schema = $schema;
     }
 
     public function all()
     {
         return $this->isPaginate
-            ? Arr::except(
-                $this->paginate->setCollection(
-                    collect($this->getAll(parent::all()))
-                )->toArray(),
-                ['links']
+            ? array_merge(
+                ['data' => $this->schematize(parent::all())],
+                $this->paginationInfo
             )
-            : $this->getAll(parent::all());
+            : $this->schematize(parent::all());
     }
 
     public function first(callable $callback = null, $default = null)
     {
-        return $this->schematize(
-            Arr::first($this->items, $callback, $default),
-            $this->casts
-        );
+        return $this->schematize(Arr::first($this->items, $callback, $default));
     }
 
     public function each(callable $callback): self
@@ -84,59 +72,36 @@ class Collection extends BaseCollection
     /**
      * Reconstruye la estructura del array en base al esquema.
      *
-     * @param array|object $item
+     * @param array|object $data
      *
      * @return array|object
      */
-    public function schematize($item, Closure $callback = null)
+    private function schematize($data)
     {
-        $data = [];
-
-        if (is_null($item)) {
-            return null;
-        }
-
-        foreach ($item as $key => $value) {
-            Arr::set($data, $key, $value);
-        }
-
-        if (!is_null($callback)) {
-            return $this->clean($callback($data));
-        }
-
-        return $this->clean($data);
-    }
-
-    private function getAll(array $items): array
-    {
-        return array_map(function ($item) {
-            return $this->schematize($item, $this->casts);
-        }, $items);
-    }
-
-    /**
-     * Analiza todos los objetos asociativos en busca de nulls
-     * en caso de hallar todos los valores null, convierte el array en null.
-     *
-     * @param mixed $data
-     */
-    private function clean($data)
-    {
-        return array_map(function ($val) {
-            if (is_array($val) || is_object($val)) {
-                return (
-                    count(
-                        array_filter(
-                            array_values($val = $this->clean($val)),
-                            function ($item) {
-                                return !is_null($item);
-                            }
-                        )
-                    ) > 0
-                ) ? $val : null;
+        if (is_array($data)) {
+            if (array_is_list($data)) {
+                return array_map(function ($item) {
+                    return $this->schema->schematize($item);
+                }, $data);
             }
+        }
 
-            return $val;
-        }, $data);
+        return $this->schema->schematize($data);
+    }
+
+    private function assignPaginationInfo(LengthAwarePaginator $pagination)
+    {
+        $this->paginationInfo = [
+            'current_page' => $pagination->currentPage(),
+            'first_page_url' => $pagination->url(1),
+            'from' => $pagination->firstItem(),
+            'last_page' => $pagination->lastPage(),
+            'last_page_url' => $pagination->url($pagination->lastPage()),
+            'next_page_url' => $pagination->nextPageUrl(),
+            'per_page' => $pagination->perPage(),
+            'prev_page_url' => $pagination->previousPageUrl(),
+            'to' => $pagination->lastItem(),
+            'total' => $pagination->total(),
+        ];
     }
 }

@@ -2,13 +2,13 @@
 
 namespace Joalvm\Utils\Traits;
 
-use Illuminate\Support\Facades\Request;
+use Symfony\Component\HttpFoundation\ParameterBag;
 
 trait Paginatable
 {
     protected $paginate = true;
     protected $page = 1;
-    protected $perPage = 25;
+    protected $perPage = 10;
     protected $maxPerPage = 150;
 
     /**
@@ -25,31 +25,20 @@ trait Paginatable
 
     protected function boot(): void
     {
-        $this->catchHttpGetParameterPaginate();
-        $this->catchHttpGetParameterPerPage();
-        $this->catchHttpGetParameterPage();
-    }
+        $bag = new ParameterBag($_GET);
 
-    private function catchHttpGetParameterPaginate()
-    {
-        $this->paginate = to_bool(Request::query('paginate')) ?? true;
-    }
+        $this->paginate = $bag->getBoolean('paginate', true);
 
-    private function catchHttpGetParameterPerPage()
-    {
-        $value = to_int(Request::query('per_page')) ?? 0;
+        $perPage = $bag->getInt('per_page', 10);
 
-        if ($value > 0 and $value <= $this->maxPerPage) {
-            $this->perPage = $value;
+        if ($perPage > 0 and $perPage <= $this->maxPerPage) {
+            $this->perPage = $perPage;
         }
-    }
 
-    private function catchHttpGetParameterPage()
-    {
-        $value = to_int(Request::query('page')) ?? 0;
+        $page = $bag->getInt('page', 1);
 
-        if (0 > $value) {
-            $this->page = $value;
+        if (0 > $page) {
+            $this->page = $page;
         }
     }
 }
