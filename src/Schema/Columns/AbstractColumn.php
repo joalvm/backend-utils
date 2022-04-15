@@ -189,7 +189,9 @@ abstract class AbstractColumn implements ColumnInterface
 
     public function setTableAs(?string $tableAs = null)
     {
-        $this->tableAs = $tableAs;
+        if (is_null($this->tableAs) and self::TYPE_COLUMN_NAME === $this->type) {
+            $this->tableAs = $tableAs;
+        }
 
         return $this;
     }

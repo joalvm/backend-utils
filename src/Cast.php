@@ -2,14 +2,17 @@
 
 namespace Joalvm\Utils;
 
+use Illuminate\Support\Arr;
+
 class Cast
 {
     public static function toStr($value): ?string
     {
-        if (is_string($value)) {
+        try {
             if (strlen($value = trim(strval($value)))) {
                 return $value;
             }
+        } catch (\Exception $e) {
         }
 
         return null;
@@ -19,6 +22,7 @@ class Cast
      * Convierte un valor al tipo de dato entero.
      *
      * @param null|int|string $value
+     * @param null|mixed      $default
      */
     public static function toInt($value): ?int
     {

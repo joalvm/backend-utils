@@ -196,9 +196,17 @@ class Schema
         return $this;
     }
 
-    public function setTableAs(string $tableAs): self
+    public function setTableAs(?string $tableAs): self
     {
-        $this->tableAs = $tableAs;
+        if (is_null($this->tableAs)) {
+            $this->tableAs = $tableAs;
+
+            foreach ($this->columns as $column) {
+                if (method_exists($column, 'setTableAs')) {
+                    $column->setTableAs($tableAs);
+                }
+            }
+        }
 
         return $this;
     }

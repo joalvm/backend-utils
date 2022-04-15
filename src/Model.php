@@ -1,11 +1,12 @@
 <?php
 
-namespace Joalvm\Utils\Traits;
+namespace Joalvm\Utils;
 
+use Illuminate\Database\Eloquent\Model as EloquentModel;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
-trait Validatable
+class Model extends EloquentModel
 {
     /**
      * Valida el modelo segun las reglas establecidas en el metodo rules.
@@ -14,14 +15,20 @@ trait Validatable
      */
     public function validate()
     {
-        $rules = $this->rules() ?? [];
-
-        $validator = Validator::make($this->getAttributes(), $rules);
+        $validator = Validator::make($this->getAttributes(), $this->rules());
 
         if ($validator->fails()) {
             throw new ValidationException($validator);
         }
 
         return $this;
+    }
+
+    /**
+     * Reglas de validación para los atributos del modelo.
+     */
+    public function rules(): array
+    {
+        return [];
     }
 }

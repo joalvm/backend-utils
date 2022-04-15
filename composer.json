@@ -39,7 +39,8 @@
             "Joalvm\\Utils\\": "src/"
         },
         "files": [
-            "src/Helpers/utils.php"
+            "src/Helpers/utils.php",
+            "src/Helpers/parsing.php"
         ]
     },
     "autoload-dev": {

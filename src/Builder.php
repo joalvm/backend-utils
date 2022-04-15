@@ -5,18 +5,21 @@ namespace Joalvm\Utils;
 use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder as BaseBuilder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Joalvm\Utils\Schema\Columns\AbstractColumn as Column;
+use Joalvm\Utils\Schema\Columns\ColumnInterface;
 use Joalvm\Utils\Schema\FilterBag;
 use Joalvm\Utils\Schema\Schema;
 use Joalvm\Utils\Schema\SortBag;
-use Joalvm\Utils\Traits\Paginatable;
 
 class Builder extends BaseBuilder
 {
-    use Paginatable {
-        paginatable::boot as paginatableBoot;
-    }
+    public const OPTION_FORCE_PAGINATION = 'force_pagination';
+
+    protected const ALLOWED_OPTIONS = [
+        self::OPTION_FORCE_PAGINATION,
+    ];
 
     /**
      * @var Connection
@@ -39,9 +42,30 @@ class Builder extends BaseBuilder
     protected $filterBag;
 
     /**
+     * @var PaginateBag
+     */
+    protected $paginateBag;
+
+    /**
      * @var Schema
      */
     private $schema;
+
+    /**
+     * Guarda el schema original cuando el from no está definido.
+     *
+     * @var Schema
+     */
+    private $temporalSchema;
+
+    /**
+     * Guarda las opciones del builder.
+     *
+     * @var array
+     */
+    private $options = [
+        self::OPTION_FORCE_PAGINATION => false,
+    ];
 
     /**
      * Initialize class.
@@ -52,10 +76,9 @@ class Builder extends BaseBuilder
     {
         parent::__construct($this->normalizeConnection($connection));
 
-        $this->paginatableBoot();
-
         $this->sortBag = new SortBag();
         $this->filterBag = new FilterBag();
+        $this->paginateBag = new PaginateBag();
     }
 
     public static function connection(string $connectionName): self
@@ -67,7 +90,35 @@ class Builder extends BaseBuilder
     {
         $this->tableAs = $as ?? $table;
 
-        return parent::from($table, $as);
+        parent::from($table, $as);
+
+        if ($this->schema) {
+            $this->initSchema($this->temporalSchema);
+            $this->temporalSchema = null;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Extiende el metodo whereIn, cuando el valor es de un solo elemento,
+     * el metodo es reemplazado por el metodo `where`, de lo contrario usa
+     * el metodo `whereIn`.
+     *
+     * {@inheritDoc}
+     */
+    public function whereIn($column, $values, $boolean = 'and', $not = false): self
+    {
+        if (is_countable($values)) {
+            if (1 === count($values)) {
+                $operator = $not ? '<>' : '=';
+                $value = array_values($values)[0];
+
+                return parent::where($column, $operator, $value, $boolean);
+            }
+        }
+
+        return parent::whereIn($column, $values, $boolean, $not);
     }
 
     public static function table(string $table, ?string $as = null): self
@@ -77,8 +128,79 @@ class Builder extends BaseBuilder
 
     public function schema(Schema $schema): self
     {
-        $this->schema = $schema
-            ->setTableAs($this->tableAs)
+        if (!$this->from) {
+            $this->temporalSchema = $schema;
+        }
+
+        return $this->initSchema($schema);
+    }
+
+    /**
+     * Obtiene elementos en base al proceso de esquematización.
+     */
+    public function all(): Collection
+    {
+        $this->prepareQuery();
+
+        return new Collection(
+            $this->paginateBag->paginate ? $this->getPaginate() : $this->get(),
+            $this->schema
+        );
+    }
+
+    public function pagination(): Collection
+    {
+        $this->forcePagination();
+        $this->prepareQuery();
+
+        return new Collection($this->getPaginate(), $this->schema);
+    }
+
+    public function item(): Item
+    {
+        $this->limit(1);
+
+        return new Item($this->schema->schematize($this->first() ?? []));
+    }
+
+    public function setOptions(array $options): self
+    {
+        foreach ($options as $option => $value) {
+            $this->setOption($option, $value);
+        }
+
+        return $this;
+    }
+
+    public function setOption(string $option, $value): self
+    {
+        if (in_array($option, self::ALLOWED_OPTIONS)) {
+            $this->options[$option] = $value;
+        }
+
+        return $this;
+    }
+
+    public function forcePagination(): self
+    {
+        return $this->setOption(self::OPTION_FORCE_PAGINATION, true);
+    }
+
+    protected function getPaginate(): LengthAwarePaginator
+    {
+        return $this->paginate(
+            $this->paginateBag->perPage,
+            array_keys($this->columns),
+            PaginateBag::PARAMETER_PAGE,
+            $this->paginateBag->page
+        );
+    }
+
+    private function initSchema(Schema $schema): self
+    {
+        $this->schema = $schema;
+
+        $this->schema->setTableAs($this->tableAs)
             ->setDriverName($this->connection->getDriverName())
             ->boot()
         ;
@@ -111,32 +233,19 @@ class Builder extends BaseBuilder
         return $this;
     }
 
-    /**
-     * Obtiene elementos en base al proceso de esquematización.
-     */
-    public function all(): Collection
+    private function prepareQuery(): void
     {
+        if ($this->options[self::OPTION_FORCE_PAGINATION]) {
+            $this->paginateBag->paginate = true;
+        }
+
         $this->initSort();
-
-        return new Collection(
-            $this->paginate
-                ? $this->paginate($this->perPage, ['*'], 'page', $this->page)
-                : $this->get(),
-            $this->schema
-        );
-    }
-
-    public function item(): Item
-    {
-        $this->limit(1);
-
-        return new Item((new Collection($this->get(), $this->schema))->first());
     }
 
     private function initSort(): void
     {
         foreach ($this->sortBag->getColumns($this->schema) as $order) {
-            /** @var \Joalvm\Utils\Schema\Columns\ColumnInterface $column */
+            /** @var ColumnInterface $column */
             $column = $order['column'];
 
             if (
@@ -151,7 +260,11 @@ class Builder extends BaseBuilder
                     ),
                     $order['direction']
                 );
-            } elseif (Column::TYPE_SUBQUERY === $column->type) {
+
+                continue;
+            }
+
+            if (Column::TYPE_SUBQUERY === $column->type) {
                 $this->orderBy($column->getColumn(), $order['direction']);
             }
         }

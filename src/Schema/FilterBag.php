@@ -3,7 +3,6 @@
 namespace Joalvm\Utils\Schema;
 
 use Illuminate\Support\Arr;
-use Joalvm\Utils\Cast;
 use Joalvm\Utils\Schema\Columns\ColumnInterface;
 use Symfony\Component\HttpFoundation\ParameterBag;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -26,7 +25,9 @@ class FilterBag extends ParameterBag
 
     public function __construct()
     {
-        parent::__construct($this->getParameters());
+        parent::__construct(
+            $this->getParameters(Arr::get($_GET, 'schema', []))
+        );
     }
 
     public function enableForce()
@@ -43,13 +44,14 @@ class FilterBag extends ParameterBag
         $this->locked = true;
     }
 
-    public function getParameters(): array
+    public function getParameters($parameters): array
     {
-        $parameters = Arr::get($_GET, 'schema', []);
         $values = [];
 
         if (is_string($parameters)) {
-            $parameters = Cast::toListStr($parameters);
+            $parameters = to_list_str(
+                filter_var($parameters, FILTER_SANITIZE_STRING)
+            );
         }
 
         $values = array_map(
@@ -57,8 +59,10 @@ class FilterBag extends ParameterBag
                 return $this->convertToRegex($parameter);
             },
             array_filter(
-                array_values($parameters),
+                $parameters,
                 function ($parameter) {
+                    $parameter = filter_var($parameter, FILTER_SANITIZE_STRING);
+
                     return is_string($parameter) and strlen($parameter) > 0;
                 }
             ),

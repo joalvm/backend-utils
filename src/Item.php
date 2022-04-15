@@ -5,6 +5,8 @@ namespace Joalvm\Utils;
 use ArrayAccess;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Enumerable;
 use JsonSerializable;
 use Stringable;
 
@@ -20,18 +22,16 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
     /**
      * Crea una nueva instancia Item.
      *
-     * @param array|object $attributes
+     * @param array|\stdClass $attributes
      */
-    public function __construct(array $attributes = [])
+    public function __construct($attributes = [])
     {
-        foreach ($attributes as $key => $value) {
-            $this->attributes[$key] = $value;
-        }
+        $this->attributes = $this->normalizeAttributes($attributes);
     }
 
     public function __toString()
     {
-        return $this->toJson(JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return $this->toJson();
     }
 
     /**
@@ -64,12 +64,11 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
     /**
      * Establecer dinámicamente el valor de un atributo.
      *
-     * @param string $key
-     * @param mixed  $value
+     * @param mixed $value
      */
-    public function __set($key, $value)
+    public function __set(string $key, $value): void
     {
-        $this->offsetSet($key, $value);
+        $this->set($key, $value);
     }
 
     /**
@@ -97,23 +96,34 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
     /**
      * Obtener un atributo de la instancia Item.
      *
-     * @param string $key
-     * @param mixed  $default
+     * @param mixed $default
      *
      * @return mixed
      */
-    public function get($key, $default = null)
+    public function get(string $key, $default = null)
     {
-        if ($this->has($key)) {
-            return $this->attributes[$key];
+        if (Arr::has($this->attributes, $key)) {
+            return Arr::get($this->attributes, $key);
         }
 
         return value($default);
     }
 
+    /**
+     * Actualiza o agrega un atributo a la instancia Item.
+     *
+     * @param mixed $value
+     */
+    public function set(string $key, $value): self
+    {
+        return Arr::set($this->attributes, $key, $value);
+
+        return $this;
+    }
+
     public function has(string $key): bool
     {
-        return array_key_exists($key, $this->attributes);
+        return Arr::has($this->attributes, $key);
     }
 
     public function isEmpty(): bool
@@ -158,7 +168,7 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
      *
      * @return string
      */
-    public function toJson($options = 0)
+    public function toJson($options = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
     {
         return json_encode($this->jsonSerialize(), $options);
     }
@@ -167,12 +177,10 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
      * Determina si un atributo existe.
      *
      * @param string $offset
-     *
-     * @return bool
      */
-    public function offsetExists($offset)
+    public function offsetExists($offset): bool
     {
-        return isset($this->attributes[$offset]);
+        return $this->has($offset);
     }
 
     /**
@@ -193,9 +201,9 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
      * @param string $offset
      * @param mixed  $value
      */
-    public function offsetSet($offset, $value)
+    public function offsetSet($offset, $value): void
     {
-        $this->attributes[$offset] = $value;
+        Arr::set($this->attributes, $offset, $value);
     }
 
     /**
@@ -203,8 +211,30 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
      *
      * @param string $offset
      */
-    public function offsetUnset($offset)
+    public function offsetUnset($offset): void
     {
-        unset($this->attributes[$offset]);
+        Arr::forget($this->attributes, $offset);
+    }
+
+    private function normalizeAttributes($attributes): array
+    {
+        $values = [];
+
+        foreach ($attributes as $key => $value) {
+            if (
+                is_array($value)
+                or is_object($value)
+                or $value instanceof Enumerable
+                or $value instanceof ArrayAccess
+            ) {
+                $values[$key] = $this->normalizeAttributes($value);
+
+                continue;
+            }
+
+            $values[$key] = $value;
+        }
+
+        return $values;
     }
 }
