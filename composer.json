@@ -1,6 +1,6 @@
 {
     "name": "joalvm/backend-utils",
-    "version": "0.1.2",
+    "version": "1.0.1",
     "description": "Laravel Backend API utils",
     "type": "library",
     "keywords": [
