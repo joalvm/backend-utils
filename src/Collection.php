@@ -2,57 +2,87 @@
 
 namespace Joalvm\Utils;
 
+use Closure;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection as BaseCollection;
-use Joalvm\Utils\Schema\Schema;
+use Joalvm\Utils\Traits\Schematizable;
 
 class Collection extends BaseCollection
 {
+    use Schematizable;
+
     /**
      * Contiene la estructura para cada item de la colección.
      *
-     * @var Schema
+     * @var array
      */
-    protected $schema;
+    protected $schema = [];
 
-    protected $paginationInfo = [];
+    /**
+     * @var null|Closure
+     */
+    protected $casts;
 
     private $isPaginate = false;
 
+    private $paginate;
+
     /**
      * @param BaseCollection|LengthAwarePaginator $items
-     * @param Schema                              $schema
      */
-    public function __construct($items, Schema $schema = null)
+    public function __construct($items, array $schema = [])
     {
+        $this->schema = $schema;
+
         $this->isPaginate = $items instanceof LengthAwarePaginator;
 
-        if ($this->isPaginate) {
-            $this->assignPaginationInfo($items);
-            parent::__construct($items->items());
-        } elseif ($items instanceof BaseCollection) {
-            parent::__construct($items->all());
-        } elseif (is_array($items)) {
-            parent::__construct($items);
-        }
+        parent::__construct(
+            $this->isPaginate
+                ? $items->items()
+                : (is_array($items) ? $items : $items->items)
+        );
 
-        $this->schema = $schema;
+        if ($this->isPaginate) {
+            $this->paginate = $items->setCollection(collect());
+        }
     }
 
     public function all()
     {
         return $this->isPaginate
-            ? array_merge(
-                ['data' => $this->schematize(parent::all())],
-                $this->paginationInfo
+            ? Arr::except(
+                $this->paginate->setCollection(
+                    collect($this->getAll(parent::all()))
+                )->toArray(),
+                [
+                    'links',
+                    "first_page_url",
+                    "last_page_url",
+                    'path',
+                    'next_page_url',
+                    'prev_page_url'
+                ]
             )
-            : $this->schematize(parent::all());
+            : $this->getAll(parent::all());
+    }
+
+    /**
+     * Get the collection of items as a plain array.
+     *
+     * @return array
+     */
+    public function toArray()
+    {
+        return $this->all();
     }
 
     public function first(callable $callback = null, $default = null)
     {
-        return $this->schematize(Arr::first($this->items, $callback, $default));
+        return $this->schematize(
+            Arr::first($this->items, $callback, $default),
+            $this->casts
+        );
     }
 
     public function each(callable $callback): self
@@ -64,44 +94,48 @@ class Collection extends BaseCollection
         return $this;
     }
 
+    /**
+     * Set the value of casts.
+     *
+     * @param null|Closure $casts
+     *
+     * @return self
+     */
+    public function setCasts($casts)
+    {
+        $this->casts = $casts;
+
+        return $this;
+    }
+
     public function isPagination(): bool
     {
         return $this->isPaginate;
     }
 
-    /**
-     * Reconstruye la estructura del array en base al esquema.
-     *
-     * @param array|object $data
-     *
-     * @return array|object
-     */
-    private function schematize($data)
+    protected function normalizeData()
     {
-        if (is_array($data)) {
-            if (array_is_list($data)) {
-                return array_map(function ($item) {
-                    return $this->schema->schematize($item);
-                }, $data);
-            }
-        }
-
-        return $this->schema->schematize($data);
+        return $this->isPaginate
+            ? Arr::except(
+                $this->paginate->setCollection(
+                    collect($this->getAll(parent::all()))
+                )->toArray(),
+                [
+                    'links',
+                    "first_page_url",
+                    "last_page_url",
+                    'path',
+                    'next_page_url',
+                    'prev_page_url'
+                ]
+            )
+            : $this->getAll(parent::all());
     }
 
-    private function assignPaginationInfo(LengthAwarePaginator $pagination)
+    private function getAll(array $items): array
     {
-        $this->paginationInfo = [
-            'current_page' => $pagination->currentPage(),
-            'first_page_url' => $pagination->url(1),
-            'from' => $pagination->firstItem(),
-            'last_page' => $pagination->lastPage(),
-            'last_page_url' => $pagination->url($pagination->lastPage()),
-            'next_page_url' => $pagination->nextPageUrl(),
-            'per_page' => $pagination->perPage(),
-            'prev_page_url' => $pagination->previousPageUrl(),
-            'to' => $pagination->lastItem(),
-            'total' => $pagination->total(),
-        ];
+        return array_map(function ($item) {
+            return $this->schematize($item, $this->casts);
+        }, $items);
     }
 }

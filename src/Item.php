@@ -3,11 +3,12 @@
 namespace Joalvm\Utils;
 
 use ArrayAccess;
+use Closure;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Enumerable;
 use JsonSerializable;
+use stdClass;
 use Stringable;
 
 class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, Stringable
@@ -26,12 +27,12 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
      */
     public function __construct($attributes = [])
     {
-        $this->attributes = $this->normalizeAttributes($attributes);
+        $this->attributes = $attributes;
     }
 
     public function __toString()
     {
-        return $this->toJson();
+        return $this->toJson(JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     /**
@@ -94,6 +95,43 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
     }
 
     /**
+     * Estructurar la consulta.
+     */
+    public function schematize(Closure $callback = null): self
+    {
+        /** @var array|stdClass */
+        $origin = $this->attributes;
+
+        $this->attributes = [];
+
+        foreach ($origin as $key => $value) {
+            $this->set($key, $value);
+
+            if ($origin instanceof stdClass) {
+                unset($origin->{$key});
+            } else {
+                unset($origin[$key]);
+            }
+        }
+
+        if (!is_null($callback)) {
+            $callback($this);
+        }
+
+        $this->attributes = $this->cleanSchematizedValues($this->attributes);
+
+        return $this;
+    }
+
+    /**
+     * Retorna la lista de keys de la instancia Item.
+     */
+    public function keys(): array
+    {
+        return array_keys($this->attributes);
+    }
+
+    /**
      * Obtener un atributo de la instancia Item.
      *
      * @param mixed $default
@@ -116,7 +154,7 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
      */
     public function set(string $key, $value): self
     {
-        return Arr::set($this->attributes, $key, $value);
+        Arr::set($this->attributes, $key, $value);
 
         return $this;
     }
@@ -128,7 +166,7 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
 
     public function isEmpty(): bool
     {
-        return empty(array_keys($this->attributes));
+        return empty(array_keys((array) $this->attributes));
     }
 
     /**
@@ -168,7 +206,7 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
      *
      * @return string
      */
-    public function toJson($options = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+    public function toJson($options = 0)
     {
         return json_encode($this->jsonSerialize(), $options);
     }
@@ -216,25 +254,31 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
         Arr::forget($this->attributes, $offset);
     }
 
-    private function normalizeAttributes($attributes): array
+    /**
+     * Analiza todos los objetos asociativos en busca de nulls
+     * en caso de hallar todos los valores null, convierte el array en null.
+     *
+     * @param array|\stdClass $data
+     */
+    private function cleanSchematizedValues($data)
     {
-        $values = [];
-
-        foreach ($attributes as $key => $value) {
-            if (
-                is_array($value)
-                or is_object($value)
-                or $value instanceof Enumerable
-                or $value instanceof ArrayAccess
-            ) {
-                $values[$key] = $this->normalizeAttributes($value);
-
-                continue;
+        return array_map(function ($val) {
+            if (is_array($val) || $val instanceof \stdClass) {
+                return (
+                    count(
+                        array_filter(
+                            array_values(
+                                $val = $this->cleanSchematizedValues($val)
+                            ),
+                            function ($item) {
+                                return !is_null($item);
+                            }
+                        )
+                    ) > 0
+                ) ? $val : null;
             }
 
-            $values[$key] = $value;
-        }
-
-        return $values;
+            return $val;
+        }, $data);
     }
 }

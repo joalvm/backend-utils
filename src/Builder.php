@@ -2,111 +2,92 @@
 
 namespace Joalvm\Utils;
 
-use Illuminate\Database\Connection;
+use Closure;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder as BaseBuilder;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use Joalvm\Utils\Schema\Columns\AbstractColumn as Column;
-use Joalvm\Utils\Schema\Columns\ColumnInterface;
-use Joalvm\Utils\Schema\FilterBag;
-use Joalvm\Utils\Schema\Schema;
-use Joalvm\Utils\Schema\SortBag;
+use Joalvm\Utils\Request\Dates;
+use Joalvm\Utils\Request\Fields;
+use Joalvm\Utils\Request\Paginate;
+use Joalvm\Utils\Request\Search;
+use Joalvm\Utils\Request\Sort;
 
 class Builder extends BaseBuilder
 {
-    public const OPTION_FORCE_PAGINATION = 'force_pagination';
-
-    protected const ALLOWED_OPTIONS = [
-        self::OPTION_FORCE_PAGINATION,
+    protected $attributes = [
+        'columns' => [],
+        'from' => [],
     ];
 
-    /**
-     * @var Connection
-     */
-    public $connection;
+    private $filterable = true;
 
     /**
-     * @var string
+     * @var Dates
      */
-    protected $tableAs;
-
-    /**
-     * @var SortBag
-     */
-    protected $sortBag;
-
-    /**
-     * @var FilterBag
-     */
-    protected $filterBag;
+    private $datesBag;
 
     /**
      * @var PaginateBag
      */
-    protected $paginateBag;
+    private $paginateBag;
 
     /**
-     * @var Schema
+     * @var Fields
      */
-    private $schema;
+    private $fieldsBag;
 
     /**
-     * Guarda el schema original cuando el from no está definido.
-     *
-     * @var Schema
+     * @var Search
      */
-    private $temporalSchema;
+    private $searchBag;
 
     /**
-     * Guarda las opciones del builder.
-     *
-     * @var array
+     * @var Sort
      */
-    private $options = [
-        self::OPTION_FORCE_PAGINATION => false,
-    ];
+    private $sortBag;
 
     /**
-     * Initialize class.
-     *
-     * @param null|Connection|ConnectionInterface|string $connection
+     * @var Closure
      */
-    public function __construct($connection = null)
+    private $castCallback;
+
+    public function __construct(?ConnectionInterface $connection = null)
     {
-        parent::__construct($this->normalizeConnection($connection));
+        parent::__construct($connection ?? DB::connection());
 
-        $this->sortBag = new SortBag();
-        $this->filterBag = new FilterBag();
-        $this->paginateBag = new PaginateBag();
+        $this->paginateBag = new Paginate();
+        $this->fieldsBag = new Fields();
+        $this->sortBag = new Sort($this->fieldsBag);
+        $this->searchBag = new Search($this->fieldsBag);
     }
 
-    public static function connection(string $connectionName): self
+    public static function connection(string $name = null): self
     {
-        return new static($connectionName);
+        return new static(DB::connection($name));
     }
 
-    public function from($table, $as = null)
+    public static function table(string $table, string $as = null): self
     {
-        $this->tableAs = $as ?? $table;
+        return (new static())->from($table, $as);
+    }
 
-        parent::from($table, $as);
+    public function from($tableName, $as = null)
+    {
+        list($table, $alias) = $this->resolveTableAlias($tableName);
 
-        if ($this->schema) {
-            $this->initSchema($this->temporalSchema);
-            $this->temporalSchema = null;
+        if ($as) {
+            $alias = $as;
         }
+
+        $this->attributes['from'] = [$table, $alias];
+
+        $this->from = "{$table} as {$alias}";
 
         return $this;
     }
 
-    /**
-     * Extiende el metodo whereIn, cuando el valor es de un solo elemento,
-     * el metodo es reemplazado por el metodo `where`, de lo contrario usa
-     * el metodo `whereIn`.
-     *
-     * {@inheritDoc}
-     */
     public function whereIn($column, $values, $boolean = 'and', $not = false): self
     {
         if (is_countable($values)) {
@@ -121,18 +102,29 @@ class Builder extends BaseBuilder
         return parent::whereIn($column, $values, $boolean, $not);
     }
 
-    public static function table(string $table, ?string $as = null): self
+    public function schema($columns = ['*'])
     {
-        return (new static())->from($table, $as);
+        $this->attributes['columns'] = $this->resolveSchema(
+            $columns,
+            '',
+            $this->attributes['from'][1] ?? ''
+        );
+
+        $this->fieldsBag->setQueryColumns($this->attributes['columns']);
+
+        return $this;
     }
 
-    public function schema(Schema $schema): self
+    /**
+     * Funcion que castea cada item.
+     *
+     * @param callable(Item): void $callback
+     */
+    public function casts(Closure $callback): self
     {
-        if (!$this->from) {
-            $this->temporalSchema = $schema;
-        }
+        $this->castCallback = $callback;
 
-        return $this->initSchema($schema);
+        return $this;
     }
 
     /**
@@ -143,146 +135,194 @@ class Builder extends BaseBuilder
         $this->prepareQuery();
 
         return new Collection(
-            $this->paginateBag->paginate ? $this->getPaginate() : $this->get(),
-            $this->schema
+            $this->paginateBag->paginate
+                ? $this->getPagination()
+                : $this->get(),
+            array_keys($this->attributes['columns']),
+            $this->castCallback
         );
-    }
-
-    public function pagination(): Collection
-    {
-        $this->forcePagination();
-        $this->prepareQuery();
-
-        return new Collection($this->getPaginate(), $this->schema);
     }
 
     public function item(): Item
     {
-        $this->limit(1);
+        $this->prepareQuery();
 
-        return new Item($this->schema->schematize($this->first() ?? []));
+        return (new Item((array) $this->first()))->schematize($this->castCallback);
     }
 
-    public function setOptions(array $options): self
+    /**
+     * Fuerza el builder a devolver los datos paginados.
+     */
+    public function pagination(): Collection
     {
-        foreach ($options as $option => $value) {
-            $this->setOption($option, $value);
-        }
+        $this->paginateBag->paginate = true;
+
+        $this->prepareQuery();
+
+        return new Collection(
+            $this->getPagination(),
+            array_keys($this->attributes['columns']),
+            $this->castCallback
+        );
+    }
+
+    public function handleTimestamp(string $column, ?string $columnTZ = null): self
+    {
+        $this->datesBag = new Dates($column, $columnTZ);
 
         return $this;
     }
 
-    public function setOption(string $option, $value): self
+    public function disablePaginate(): self
     {
-        if (in_array($option, self::ALLOWED_OPTIONS)) {
-            $this->options[$option] = $value;
-        }
+        $this->paginateBag->disable();
 
         return $this;
     }
 
-    public function forcePagination(): self
+    public function enablePaginate(): self
     {
-        return $this->setOption(self::OPTION_FORCE_PAGINATION, true);
+        $this->paginateBag->enable();
+
+        return $this;
     }
 
-    protected function getPaginate(): LengthAwarePaginator
+    public static function setPreffix(?string $preffix, string $value): string
+    {
+        return (!empty($preffix) ? "{$preffix}." : '') . $value;
+    }
+
+    public static function isColumnAlias($ColumnAlias): bool
+    {
+        return \preg_match(
+            '/^(([a-zA-Z])(\\w+)?\\.)?([a-zA-Z]\\w+|_)$/i',
+            $ColumnAlias
+        );
+    }
+
+    protected function prepareQuery()
+    {
+        $this->fieldsBag->setFilterable($this->filterable)->run($this);
+        $this->sortBag->run($this);
+        $this->searchBag->run($this);
+
+        if ($this->datesBag) {
+            $this->datesBag->run($this);
+        }
+    }
+
+    protected function getPagination(): LengthAwarePaginator
     {
         return $this->paginate(
             $this->paginateBag->perPage,
             array_keys($this->columns),
-            PaginateBag::PARAMETER_PAGE,
+            Paginate::PARAMETER_PAGE,
             $this->paginateBag->page
         );
     }
 
-    private function initSchema(Schema $schema): self
+    private function resolveTableAlias(string $tableName): array
     {
-        $this->schema = $schema;
+        $tableName = str_replace(' as ', ' AS ', $tableName);
 
-        $this->schema->setTableAs($this->tableAs)
-            ->setDriverName($this->connection->getDriverName())
-            ->boot()
-        ;
+        return (2 == count($parts = explode(' AS ', $tableName)))
+            ? $parts
+            : (
+                2 == count($parts = explode(' ', $tableName))
+                    ? $parts
+                    : [$tableName, $tableName]
+            );
+    }
 
-        foreach ($this->filterBag->getColumns($schema) as $column) {
-            switch ($column->type) {
-                case Column::TYPE_SUBQUERY:
-                    $this->selectSub(
-                        $column->getColumn(),
-                        DB::raw($column->getColumnAs())
-                    );
+    private function resolveSchema(
+        array $fields,
+        string $preffix = '',
+        string $aliasTable = ''
+    ) {
+        $nfields = [];
 
-                    break;
+        foreach ($fields as $aliasColumn => $field) {
+            $params = [
+                'field' => $field,
+                'preffix' => $preffix,
+                'aliasTable' => $aliasTable,
+                'aliasColumn' => $aliasColumn,
+            ];
 
-                case Column::TYPE_EXPRESSION:
-                    $this->selectRaw(
-                        DB::raw($column->getColumn(true)),
-                        $column->bindings
-                    );
-
-                    break;
-
-                default:
-                    $this->addSelect(DB::raw($column->getColumn(true)));
+            if (is_string($field)) {
+                $pfield = explode('.', $field);
+                if (2 === count($pfield)) {
+                    $params['aliasTable'] = $pfield[0];
+                    $params['field'] = $pfield[1];
+                }
             }
 
-            $column->setAddedToSelect(true);
+            if (is_numeric($aliasColumn)) {
+                $nfields = array_merge(
+                    $nfields,
+                    $this->resolveField($params)
+                );
+            } elseif (is_string($aliasColumn)) {
+                if (is_array($field)) {
+                    $parts = explode(':', $aliasColumn);
+                    $ast = '';
+
+                    if (2 == count($parts)) {
+                        $parts = array_map('trim', $parts);
+                        if (false !== strpos($parts[1], '.*')) {
+                            $parts[1] = str_replace('.*', '', $parts[0]);
+                            $ast = '.*';
+                        }
+                    }
+
+                    $nfields = array_merge(
+                        $nfields,
+                        $this->resolveSchema(
+                            $field,
+                            self::setPreffix($preffix, $parts[0] . $ast),
+                            2 == count($parts) ? $parts[1] : $aliasTable
+                        )
+                    );
+                } else {
+                    $nfields = array_merge(
+                        $nfields,
+                        $this->resolveField($params)
+                    );
+                }
+            }
         }
 
-        return $this;
+        return $nfields;
     }
 
-    private function prepareQuery(): void
+    private function resolveField(array $params)
     {
-        if ($this->options[self::OPTION_FORCE_PAGINATION]) {
-            $this->paginateBag->paginate = true;
-        }
+        $field = is_string($params['field'])
+            ? trim($params['field'])
+            : $params['field'];
 
-        $this->initSort();
-    }
+        $key = '';
+        $value = '';
 
-    private function initSort(): void
-    {
-        foreach ($this->sortBag->getColumns($this->schema) as $order) {
-            /** @var ColumnInterface $column */
-            $column = $order['column'];
-
-            if (
-                Column::TYPE_COLUMN_NAME === $column->type
-                or Column::TYPE_EXPRESSION === $column->type
-            ) {
-                $this->orderBy(
-                    DB::raw(
-                        $column->getAddedToSelect()
-                            ? $column->getColumnAs()
-                            : $column->getColumn()
-                    ),
-                    $order['direction']
+        if ($field instanceof Expression or is_callable($field)) {
+            $key = self::setPreffix($params['preffix'], $params['aliasColumn']);
+            $value = $field;
+        } elseif (is_string($field)) {
+            if (self::isColumnAlias($field)) {
+                $key = self::setPreffix(
+                    $params['preffix'],
+                    !is_numeric($params['aliasColumn'])
+                        ? $params['aliasColumn']
+                        : $field
                 );
 
-                continue;
+                $value = self::setPreffix($params['aliasTable'], $field);
+            } else {
+                $key = self::setPreffix($params['preffix'], $params['aliasColumn']);
+                $value = DB::raw($field);
             }
-
-            if (Column::TYPE_SUBQUERY === $column->type) {
-                $this->orderBy($column->getColumn(), $order['direction']);
-            }
-        }
-    }
-
-    /**
-     * Normaliza la conección pasada a la clase.
-     *
-     * @param null|ConnectionInterface|string $connection
-     */
-    private function normalizeConnection($connection): ConnectionInterface
-    {
-        if (is_string($connection) || is_null($connection)) {
-            return DB::connection($connection ?? DB::getDefaultConnection());
         }
 
-        if ($connection instanceof ConnectionInterface) {
-            return $connection;
-        }
+        return [$key => $value];
     }
 }

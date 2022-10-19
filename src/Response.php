@@ -2,15 +2,14 @@
 
 namespace Joalvm\Utils;
 
-use Exception;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\Paginator;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Response as BaseResponse;
-use Illuminate\Support\Enumerable;
-use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Validation\ValidationException;
-use PDOException;
-use Symfony\Component\HttpKernel\Exception\HttpException;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
+use Joalvm\Utils\Exceptions\NotFoundException;
+use Joalvm\Utils\Exceptions\UnprocessableEntityException;
 
 class Response extends BaseResponse
 {
@@ -36,6 +35,11 @@ class Response extends BaseResponse
         return $statusCode >= 200 && $statusCode < 300;
     }
 
+    public static function success(): self
+    {
+        return new self(null, BaseResponse::HTTP_OK);
+    }
+
     public static function collection(
         $content,
         int $statusCode = self::HTTP_OK,
@@ -50,7 +54,7 @@ class Response extends BaseResponse
         ?string $message = null
     ) {
         if (self::isEmptyContent($content) and self::HTTP_OK === $statusCode) {
-            return self::catch(new NotFoundHttpException());
+            return self::catch(new NotFoundException());
         }
 
         return new static($content, $statusCode, $message);
@@ -90,7 +94,7 @@ class Response extends BaseResponse
 
         if (self::isValidatorException($ex)) {
             $httpCode = self::HTTP_UNPROCESSABLE_ENTITY;
-            $content = call_user_func([$ex, 'errors']);
+            $content = $ex->errors();
             $message = $ex->getMessage(); // Respuesta custom
         }
 
@@ -102,31 +106,17 @@ class Response extends BaseResponse
         return array_merge(
             [
                 'error' => !$this->isSuccessfulCode($httpCode),
-                'message' => $this->normalizeMessage($message, $httpCode),
+                'message' => (
+                    empty($message)
+                    ? strtoupper(self::$statusTexts[$httpCode])
+                    : $message
+                ),
                 'code' => $httpCode,
             ],
-            $this->normalizeData($content),
+            (is_a($content, Collection::class) and $content->isPagination())
+                ? $content->toArray()
+                : ['data' => $content]
         );
-    }
-
-    private function normalizeMessage($message, $httpCode): string
-    {
-        if (!Config::get('app.debug') || empty($message)) {
-            return strtoupper(self::$statusTexts[$httpCode]);
-        }
-
-        return $message;
-    }
-
-    private function normalizeData($content): array
-    {
-        if ($content instanceof Collection) {
-            return !$content->isPagination()
-                ? ['data' => $content->all()]
-                : $content->all();
-        }
-
-        return ['data' => $content];
     }
 
     private static function normalizeHttpCode($statusCode)
@@ -142,33 +132,32 @@ class Response extends BaseResponse
 
     private static function isEmptyContent($content): bool
     {
-        if ($content instanceof Enumerable) {
-            return $content->isEmpty();
+        $empty = false;
+
+        if (self::isPaginator($content) || self::isCollection($content)) {
+            $empty = $content->isEmpty();
+        } else {
+            $empty = empty($content);
         }
 
-        return empty($content);
+        return $empty;
     }
 
-    /**
-     * Determina si la excepción es un validador con codigo 422.
-     *
-     * @param HttpException|UnprocessableEntityHttpException|ValidationException $ex
-     */
-    private static function isValidatorException(\Throwable $ex): bool
+    private static function isPaginator($data)
     {
-        if (
-            $ex instanceof UnprocessableEntityHttpException
-            || $ex instanceof ValidationException
-        ) {
-            return true;
-        }
+        return $data instanceof Paginator || $data instanceof LengthAwarePaginator;
+    }
 
-        if ($ex instanceof PDOException) {
-            return false;
-        }
+    private static function isValidatorException($ex): bool
+    {
+        return $ex instanceof UnprocessableEntityException
+        || $ex instanceof ValidationException;
+    }
 
-        return self::HTTP_UNPROCESSABLE_ENTITY === (
-            $ex->status ?? $ex->getStatusCode() ?? 0
-        );
+    private static function isCollection($data): bool
+    {
+        return
+            ($data instanceof BaseCollection)
+            || ($data instanceof EloquentCollection);
     }
 }

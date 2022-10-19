@@ -8,7 +8,7 @@ if (!function_exists('to_str')) {
      */
     function to_str($value): ?string
     {
-        return strlen($str = trim(strval($value))) > 0 ? $str : null;
+        return !strlen($value = trim(strval($value))) ? null : $value;
     }
 }
 
@@ -41,21 +41,13 @@ if (!function_exists('to_float')) {
     function to_float($value, int $precision = 0, int $mode = PHP_ROUND_HALF_UP): ?float
     {
         if (is_float($value)) {
-            if ($precision > 0) {
-                return round($value, $precision, $mode);
-            }
-
-            return $value;
+            return 0 === $precision ? $value : round($value, $precision, $mode);
         }
 
         if (is_numeric($value = is_string($value) ? to_str($value) : $value)) {
-            $value = floatval($value);
-
-            if ($precision > 0) {
-                return round($value, $precision, $mode);
-            }
-
-            return $value;
+            return 0 === $precision
+                ? floatval($value)
+                : round(floatval($value), $precision, $mode);
         }
 
         return null;
@@ -98,6 +90,7 @@ if (!function_exists('to_bool')) {
             if (preg_match('/^(true|1|yes|on|y|t)$/i', to_str($value))) {
                 return true;
             }
+
             if (preg_match('/^(false|0|no|n|off|f)$/i', to_str($value))) {
                 return false;
             }
@@ -111,45 +104,28 @@ if (!function_exists('to_list')) {
     /**
      * Castea un valor a una lista, si es un string se separa por comas.
      *
-     * @param mixed $value
+     * @param mixed $values
      */
-    function to_list($value, bool $keepNulls = false): array
-    {
-        if (is_string($value)) {
-            $value = array_map(
-                function ($item) {
-                    return strlen($item = trim($item)) > 0 ? $item : null;
-                },
-                explode(',', $value)
-            );
+    function to_list(
+        $values,
+        bool $keepNulls = false,
+        string $separator = ','
+    ): array {
+        if (is_string($values)) {
+            $values = explode($separator, $values);
+            foreach ($values as $index => $value) {
+                $values[$index] = to_str($value);
+            }
         }
 
-        if (is_array($value)) {
-            return array_filter(
-                $value,
-                function ($value) use ($keepNulls) {
-                    return (!$keepNulls and is_null($value)) ? false : true;
-                }
-            );
+        if (!is_array($values)) {
+            $values = [];
         }
 
-        return [];
-    }
-}
-
-if (!function_exists('to_list_str')) {
-    /**
-     * Castea un valor a una lista de strings, si es un string se separa por comas.
-     *
-     * @param mixed $value
-     */
-    function to_list_str($value, bool $keepNulls = false): array
-    {
-        return array_map(
-            function ($item) {
-                return is_null($item) ? $item : strval($item);
-            },
-            to_list($value, $keepNulls)
+        return array_values(
+            array_filter($values, function ($value) use ($keepNulls) {
+                return is_null($value) ? $keepNulls : true;
+            })
         );
     }
 }
@@ -158,23 +134,25 @@ if (!function_exists('to_list_int')) {
     /**
      * Castea un valor a una lista de enteros, si es un string se separa por comas.
      *
-     * @param mixed $value
+     * @param mixed $values
      */
-    function to_list_int($value, bool $keepNulls = false): array
+    function to_list_int($values, bool $keepNulls = false, string $separator = ','): array
     {
-        return array_values(
-            array_filter(
-                array_map(
-                    function ($item) {
-                        return is_null($item) ? $item : to_int($item) ?? '';
-                    },
-                    to_list($value, $keepNulls)
-                ),
-                function ($item) {
-                    return is_int($item) or is_null($item);
-                }
-            )
-        );
+        $array = [];
+
+        foreach (to_list($values, $keepNulls, $separator) as $value) {
+            if (is_null($value) and $keepNulls) {
+                $array[] = null;
+
+                continue;
+            }
+
+            if (is_numeric($value = to_int($value))) {
+                $array[] = $value;
+            }
+        }
+
+        return $array;
     }
 }
 
@@ -182,29 +160,30 @@ if (!function_exists('to_list_float')) {
     /**
      * Castea un valor a una lista de flotantes, si es un string se separa por comas.
      *
-     * @param mixed $value
+     * @param mixed $values
      */
     function to_list_float(
-        $value,
+        $values,
         bool $keepNulls = false,
         int $precision = 0,
-        int $mode = PHP_ROUND_HALF_UP
+        int $mode = PHP_ROUND_HALF_UP,
+        string $separator = ','
     ): array {
-        return array_values(
-            array_filter(
-                array_map(
-                    function ($item) use ($precision, $mode) {
-                        return is_null($item)
-                            ? $item
-                            : to_float($item, $precision, $mode) ?? '';
-                    },
-                    to_list($value, $keepNulls)
-                ),
-                function ($item) {
-                    return is_float($item) or is_null($item);
-                }
-            )
-        );
+        $array = [];
+
+        foreach (to_list($values, $keepNulls, $separator) as $value) {
+            if (is_null($value) and $keepNulls) {
+                $array[] = null;
+
+                continue;
+            }
+
+            if (is_numeric($value = to_float($value, $precision, $mode))) {
+                $array[] = $value;
+            }
+        }
+
+        return $array;
     }
 }
 
@@ -212,29 +191,30 @@ if (!function_exists('to_list_numeric')) {
     /**
      * Castea un valor a una lista de enteros o flotantes, si es un string se separa por comas.
      *
-     * @param mixed $value
+     * @param mixed $values
      */
     function to_list_numeric(
-        $value,
+        $values,
         bool $keepNulls = false,
         int $precision = 0,
-        int $mode = PHP_ROUND_HALF_UP
+        int $mode = PHP_ROUND_HALF_UP,
+        string $separator = ','
     ): array {
-        return array_values(
-            array_filter(
-                array_map(
-                    function ($item) use ($precision, $mode) {
-                        return is_null($item)
-                            ? $item
-                            : to_numeric($item, $precision, $mode) ?? '';
-                    },
-                    to_list($value, $keepNulls)
-                ),
-                function ($item) {
-                    return is_numeric($item) or is_null($item);
-                }
-            )
-        );
+        $array = [];
+
+        foreach (to_list($values, $keepNulls, $separator) as $value) {
+            if (is_null($value) and $keepNulls) {
+                $array[] = null;
+
+                continue;
+            }
+
+            if (is_numeric($value = to_numeric($value, $precision, $mode))) {
+                $array[] = $value;
+            }
+        }
+
+        return $array;
     }
 }
 
@@ -242,81 +222,24 @@ if (!function_exists('to_list_bool')) {
     /**
      * Castea un valor a una lista de booleano, si es un string se separa por comas.
      *
-     * @param mixed $value
+     * @param mixed $values
      */
-    function to_list_bool($value, bool $keepNulls = false): array
+    function to_list_bool($values, bool $keepNulls = false, string $separator = ','): array
     {
-        return array_values(
-            array_filter(
-                array_map(
-                    function ($item) {
-                        return is_null($item) ? $item : to_bool($item) ?? '';
-                    },
-                    to_list($value, $keepNulls)
-                ),
-                function ($item) {
-                    return is_bool($item) or is_null($item);
-                }
-            )
-        );
-    }
-}
+        $array = [];
 
-if (!function_exists('param_str')) {
-    /**
-     * Filtra y sanitiza un valor de una variable de entrada.
-     *
-     * @param mixed $value
-     */
-    function param_str($value): ?string
-    {
-        return to_str(filter_var($value, FILTER_SANITIZE_STRING));
-    }
-}
+        foreach (to_list($values, $keepNulls, $separator) as $value) {
+            if (is_null($value) and $keepNulls) {
+                $array[] = null;
 
-if (!function_exists('param_int')) {
-    /**
-     * Obtiene un parametro de la petición, si no existe retorna un valor por defecto.
-     *
-     * @param mixed $value
-     */
-    function param_int($value): ?int
-    {
-        return to_int(
-            filter_var(
-                $value,
-                FILTER_SANITIZE_NUMBER_INT,
-                [
-                    'filter' => FILTER_VALIDATE_INT,
-                    'flags' => FILTER_FLAG_ALLOW_FRACTION,
-                ]
-            )
-        );
-    }
-}
+                continue;
+            }
 
-if (!function_exists('param_float')) {
-    /**
-     * Obtiene un parametro de la petición, si no existe retorna un valor por defecto.
-     *
-     * @param mixed $value
-     */
-    function param_float(
-        $value,
-        int $precision = 0,
-        int $mode = PHP_ROUND_HALF_UP
-    ): ?float {
-        return to_float(
-            filter_var(
-                $value,
-                FILTER_SANITIZE_NUMBER_FLOAT,
-                [
-                    'filter' => FILTER_VALIDATE_FLOAT,
-                    'flags' => FILTER_FLAG_ALLOW_FRACTION,
-                ]
-            ),
-            $precision,
-            $mode
-        );
+            if (is_bool($value = to_bool($value))) {
+                $array[] = $value;
+            }
+        }
+
+        return $array;
     }
 }
