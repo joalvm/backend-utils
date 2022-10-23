@@ -57,11 +57,11 @@ class Collection extends BaseCollection
                 )->toArray(),
                 [
                     'links',
-                    "first_page_url",
-                    "last_page_url",
+                    'first_page_url',
+                    'last_page_url',
                     'path',
                     'next_page_url',
-                    'prev_page_url'
+                    'prev_page_url',
                 ]
             )
             : $this->getAll(parent::all());
@@ -122,11 +122,11 @@ class Collection extends BaseCollection
                 )->toArray(),
                 [
                     'links',
-                    "first_page_url",
-                    "last_page_url",
+                    'first_page_url',
+                    'last_page_url',
                     'path',
                     'next_page_url',
-                    'prev_page_url'
+                    'prev_page_url',
                 ]
             )
             : $this->getAll(parent::all());

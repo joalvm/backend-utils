@@ -1,8 +1,12 @@
+* text=auto eol=lf
+
 /.editorconfig      export-ignore
 /.gitattributes     export-ignore
 /.gitignore         export-ignore
 /.php_cs.php        export-ignore
 /.github            export-ignore
 /ruleset.xml        export-ignore
-
-* text=auto eol=lf
+/phpunit.xml        export-ignore
+/index.php          export-ignore
+/progress           export-ignore
+/composer.lock      export-ignore

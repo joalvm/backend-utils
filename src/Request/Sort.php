@@ -2,19 +2,28 @@
 
 namespace Joalvm\Utils\Request;
 
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Query\Grammars\Grammar;
 use Illuminate\Support\Facades\Request;
 use Joalvm\Utils\Builder;
+use Symfony\Component\HttpFoundation\ParameterBag;
 
-class Sort
+class Sort extends ParameterBag
 {
+    public const PARAMETER_SORT = 'sort';
+
+    public const ORDER_DESC = 'DESC';
+
+    public const ORDER_ASC = 'ASC';
+
+    public const DEFAULT_ORDER = self::ORDER_ASC;
+
     /**
      * Dependecia de la clase Fields que permite obtner
      * la lista de columnas que estan permitidas.
      *
-     * @var Fields
+     * @var Schema
      */
-    protected $fields;
+    protected $schema;
 
     /**
      * Los short=>order obtenidos.
@@ -23,43 +32,55 @@ class Sort
      */
     protected $values = [];
 
-    public function __construct(Fields $fields)
-    {
-        $this->fields = $fields;
+    /**
+     * Grammar del builder.
+     *
+     * @var Grammar
+     */
+    private $grammar;
 
-        $this->values = $this->init(Request::query('sort'));
+    public function __construct(Grammar $grammar)
+    {
+        $this->grammar = $grammar;
+
+        parent::__construct(
+            $this->normalizeParameter(Request::query(self::PARAMETER_SORT, []))
+        );
+    }
+
+    public function loadSchema(Schema $schema)
+    {
+        $this->schema = $schema;
     }
 
     public function getValues()
     {
-        return $this->filterValues();
+        return $this->filterInSchema();
     }
 
     public function run(Builder &$builder)
     {
-        foreach ($this->filterValues() as $order) {
-            $builder->orderBy($order->column, $order->direction);
+        foreach ($this->filterInSchema() as $order) {
+            $builder->orderBy($order['column'], $order['mode']);
         }
     }
 
-    protected function filterValues(): array
+    protected function filterInSchema(): array
     {
         $values = [];
 
-        foreach ($this->values as $field => $order) {
-            if (!$this->fields->exists($field)) {
+        if (!$this->schema) {
+            return [];
+        }
+
+        foreach ($this->parameters as $item => $order) {
+            $sitem = $this->schema->getColumnOrAlias($item);
+
+            if (!$sitem) {
                 continue;
             }
 
-            $nfield = $this->fields->getDefaults()[$field];
-
-            $isObject = is_object($nfield) or is_callable($nfield);
-
-            array_push($values, (object) [
-                'column' => $isObject ? DB::raw("\"{$field}\"") : $nfield,
-                'direction' => $order,
-                'is_object' => $isObject,
-            ]);
+            array_push($values, ['column' => $sitem, 'mode' => $order]);
         }
 
         return $values;
@@ -68,46 +89,47 @@ class Sort
     /**
      * Inicia la captura de todos los ordenamientos.
      *
-     * @param [type] $params
+     * @var array|string
+     *
+     * @param mixed $sorts
      */
-    protected function init($params)
+    protected function normalizeParameter($sorts): array
     {
         $values = [];
 
-        if (!is_array_assoc($params)) {
-            return $values;
+        if (is_string($sorts)) {
+            $sorts = to_list($sorts);
         }
 
-        foreach ($params as $field => $order) {
-            if (is_numeric($field)) {
-                if (!is_string($order)) {
-                    continue;
-                }
+        foreach ($sorts as $schemaItem => $order) {
+            $item = $schemaItem;
+            $mode = to_str($order);
 
-                $parts = explode(' ', trim($order));
+            if (is_numeric($schemaItem)) {
+                $parts = explode(' ', $mode);
 
-                $values[$parts[0]] = $this->checkOrder($parts[1] ?? '');
-            } elseif (is_string($field) and is_string($order)) {
-                if (!is_string($order)) {
-                    continue;
-                }
-
-                $values[$field] = $this->checkOrder(trim($order));
+                $item = $parts[0];
+                $mode = $this->orderMode($parts[1] ?? '');
             }
+
+            if (is_string($schemaItem)) {
+                $mode = $this->orderMode($mode);
+            }
+
+            $values[$item] = $mode;
         }
 
         return $values;
     }
 
-    private function checkOrder($order)
+    private function orderMode($mode): string
     {
-        return in_array($this->toUpper($order), ['ASC', 'DESC'])
-            ? ($this->toUpper($order))
-            : 'DESC';
-    }
+        $mode = mb_strtoupper($mode, 'utf-8');
 
-    private function toUpper(string $text): string
-    {
-        return mb_strtoupper($text, 'utf-8');
+        if (in_array($mode, [self::ORDER_DESC, self::ORDER_DESC])) {
+            return $mode;
+        }
+
+        return self::DEFAULT_ORDER;
     }
 }
