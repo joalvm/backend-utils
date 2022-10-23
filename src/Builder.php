@@ -9,8 +9,8 @@ use Illuminate\Database\Query\Expression;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Joalvm\Utils\Request\Dates;
-use Joalvm\Utils\Request\Fields;
 use Joalvm\Utils\Request\Paginate;
+use Joalvm\Utils\Request\Schema;
 use Joalvm\Utils\Request\Search;
 use Joalvm\Utils\Request\Sort;
 
@@ -34,9 +34,9 @@ class Builder extends BaseBuilder
     private $paginateBag;
 
     /**
-     * @var Fields
+     * @var Schema
      */
-    private $fieldsBag;
+    private $schemaBag;
 
     /**
      * @var Search
@@ -57,10 +57,10 @@ class Builder extends BaseBuilder
     {
         parent::__construct($connection ?? DB::connection());
 
+        $this->schemaBag = new Schema();
         $this->paginateBag = new Paginate();
-        $this->fieldsBag = new Fields();
-        $this->sortBag = new Sort($this->fieldsBag);
-        $this->searchBag = new Search($this->fieldsBag);
+        $this->sortBag = new Sort($this->grammar);
+        $this->searchBag = new Search($this->grammar);
     }
 
     public static function connection(string $name = null): self
@@ -110,7 +110,9 @@ class Builder extends BaseBuilder
             $this->attributes['from'][1] ?? ''
         );
 
-        $this->fieldsBag->setQueryColumns($this->attributes['columns']);
+        $this->schemaBag->loadItems($this->attributes['columns']);
+        $this->sortBag->loadSchema($this->schemaBag);
+        $this->searchBag->loadSchema($this->schemaBag);
 
         return $this;
     }
@@ -145,7 +147,7 @@ class Builder extends BaseBuilder
 
     public function item(): Item
     {
-        $this->prepareQuery();
+        $this->schemaBag->setFilterable($this->filterable)->run($this);
 
         return (new Item((array) $this->first()))->schematize($this->castCallback);
     }
@@ -202,7 +204,7 @@ class Builder extends BaseBuilder
 
     protected function prepareQuery()
     {
-        $this->fieldsBag->setFilterable($this->filterable)->run($this);
+        $this->schemaBag->setFilterable($this->filterable)->run($this);
         $this->sortBag->run($this);
         $this->searchBag->run($this);
 

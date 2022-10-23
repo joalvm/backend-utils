@@ -32,6 +32,20 @@ if (!function_exists('is_array_list')) {
     }
 }
 
+if (!function_exists('sanitize_str')) {
+    /**
+     * Limpia un string.
+     */
+    function sanitize_str(string $value): string
+    {
+        return str_replace(
+            ["'", '"'],
+            ['&#39;', '&#34;'],
+            preg_replace('/\x00|<[^>]*>?/', '', $value)
+        );
+    }
+}
+
 if (!function_exists('format_bytes')) {
     /**
      * Convierte el numero bytes en un formato mas legible.

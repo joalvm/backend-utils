@@ -8,9 +8,11 @@ use Illuminate\Support\Facades\DB;
 use Joalvm\Utils\Builder;
 use Symfony\Component\HttpFoundation\ParameterBag;
 
-class Fields extends ParameterBag
+class Schema extends ParameterBag
 {
-    protected $queryColumns = [];
+    public const PARAMETER_SCHEMA = 'schema';
+
+    protected $items = [];
 
     protected $filterable = true;
 
@@ -21,23 +23,13 @@ class Fields extends ParameterBag
 
     public function catchParameters(): array
     {
-        $parameters = Arr::get($_GET, 'fields', []);
+        $parameters = Arr::get($_GET, self::PARAMETER_SCHEMA, []);
 
         if (is_string($parameters)) {
             $parameters = to_list($parameters);
         }
 
-        return array_map(
-            function ($parameter) {
-                return filter_var($parameter, FILTER_SANITIZE_STRING);
-            },
-            array_filter(
-                array_map('strval', array_values($parameters)),
-                function ($parameter) {
-                    return strlen(trim($parameter)) > 0;
-                }
-            ),
-        );
+        return array_map('sanitize_str', to_list($parameters));
     }
 
     public function setFilterable(bool $filterable = true): self
@@ -47,9 +39,9 @@ class Fields extends ParameterBag
         return $this;
     }
 
-    public function setQueryColumns(array $queryColumns): self
+    public function loadItems(array $items): self
     {
-        $this->queryColumns = $queryColumns;
+        $this->items = $items;
 
         return $this;
     }
@@ -61,12 +53,60 @@ class Fields extends ParameterBag
 
     public function exists(string $field): bool
     {
-        return array_key_exists($field, $this->queryColumns);
+        return array_key_exists($field, $this->items);
     }
 
-    public function getDefaults()
+    /**
+     * Obtiene un item del schema.
+     *
+     * @return null|mixed
+     */
+    public function getItem(string $item)
     {
-        return $this->queryColumns;
+        if ($this->exists($item)) {
+            return $this->items[$item];
+        }
+
+        return null;
+    }
+
+    public function getColumnOrAlias(string $alias)
+    {
+        if (!$this->exists($alias)) {
+            return null;
+        }
+
+        $item = $this->getItem($alias);
+
+        if (is_object($item) or is_callable($item)) {
+            return $alias;
+        }
+
+        if (is_string($item) and !$this->isColumnable($item)) {
+            return $alias;
+        }
+
+        return $item;
+    }
+
+    public function getColumnableItem(string $alias): ?string
+    {
+        if (!$this->exists($alias)) {
+            return null;
+        }
+
+        $item = $this->getItem($alias);
+
+        if (is_string($item) and $this->isColumnable($item)) {
+            return $item;
+        }
+
+        return null;
+    }
+
+    public function isColumnable(string $column): bool
+    {
+        return preg_match('/^[a-z](([a-z0-9_]+)?\.{1})?[a-z0-9_]+$/i', $column);
     }
 
     public function run(Builder &$builder): void
@@ -75,7 +115,7 @@ class Fields extends ParameterBag
             $columns = $this->getFilteredColumns();
 
             if (empty($columns)) {
-                $columns = $this->queryColumns;
+                $columns = $this->items;
             }
         }
 
@@ -101,7 +141,7 @@ class Fields extends ParameterBag
         $matches = $this->generateMatches();
 
         return array_filter(
-            $this->queryColumns,
+            $this->items,
             function ($key) use ($matches) {
                 foreach ($matches as $match) {
                     if (preg_match($match, $key)) {

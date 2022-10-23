@@ -2,37 +2,56 @@
 
 namespace Joalvm\Utils\Request;
 
+use Illuminate\Database\Query\Grammars\Grammar;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Request;
 use Joalvm\Utils\Builder;
-use stdClass;
 
 class Search
 {
+    public const PARAMETER_CONTAINS = 'contains';
+    public const PARAMETER_STARTS_WITH = 'starts_with';
+    public const PARAMETER_ENDS_WITH = 'ends_with';
+
+    public const ALLOWED_PARAMETERS = [
+        self::PARAMETER_CONTAINS,
+        self::PARAMETER_ENDS_WITH,
+        self::PARAMETER_STARTS_WITH,
+    ];
+
+    public const KEY_ITEMS = 'items';
+    public const KEY_TEXT = 'text';
+
     /**
-     * @var Fields
+     * @var Schema
      */
-    private $fields;
+    private $schema;
 
-    private $values;
+    /**
+     * @var array
+     */
+    private $values = [];
 
-    public function __construct(Fields $fields)
+    /**
+     * @var Grammar
+     */
+    private $grammar;
+
+    public function __construct(Grammar $grammar)
     {
-        $this->fields = $fields;
+        $this->grammar = $grammar;
 
-        $this->init();
+        $this->catchParameters();
+    }
+
+    public function loadSchema(Schema $schema)
+    {
+        $this->schema = $schema;
     }
 
     public function getValues()
     {
         return $this->values;
-    }
-
-    public function init()
-    {
-        $this->startsWith();
-        $this->endsWith();
-        $this->contains();
     }
 
     public function run(Builder &$builder)
@@ -42,97 +61,66 @@ class Search
         }
 
         foreach ($this->values as $value) {
-            $builder->where(function ($query) use ($value) {
-                foreach ($value->fields as $field) {
-                    if (!$this->fields->exists($field)) {
+            $builder->where(function (Builder $query) use ($value) {
+                foreach ($value[self::KEY_ITEMS] as $item) {
+                    if (!$item = $this->schema->getColumnableItem($item)) {
                         continue;
                     }
 
-                    $field = $this->sanatizeField($field);
+                    $quoted = $this->grammar->quoteString($value[self::KEY_TEXT]);
+                    $stmText = "{$quoted}::text";
+                    $stmColumn = "{$item}::text";
+                    $operator = 'ilike';
 
-                    $query->orWhere(
-                        DB::raw("LOWER({$field}::text)"),
-                        'like',
-                        DB::raw("LOWER('{$value->text}')")
-                    );
+                    if (!in_array('ilike', $this->grammar->getOperators())) {
+                        $stmText = "LOWER({$quoted}::text)";
+                        $stmColumn = "LOWER({$item}::text)";
+                        $operator = 'like';
+                    }
+
+                    $query->orWhere(DB::raw($stmColumn), $operator, DB::raw($stmText));
                 }
             });
         }
     }
 
-    public function startsWith()
+    private function catchParameters(): void
     {
-        $data = new stdClass();
+        foreach (self::ALLOWED_PARAMETERS as $parameter) {
+            list($items, $text) = $this->getQuery($parameter);
 
-        list($fields, $text) = $this->getQuery('starts_with');
+            if (!$text or !$items) {
+                continue;
+            }
 
-        if (empty($text)) {
-            return false;
+            $text = sanitize_str($text);
+
+            array_push($this->values, [
+                self::KEY_ITEMS => $items,
+                self::KEY_TEXT => $this->wrap($parameter, $text),
+            ]);
         }
-
-        $data->text = "{$text}%";
-        $data->fields = $fields;
-
-        $this->values[] = $data;
     }
 
-    public function endsWith()
+    private function wrap(string $filter, $text)
     {
-        $data = new stdClass();
+        switch ($filter) {
+            case self::PARAMETER_CONTAINS: return "%{$text}%";
 
-        list($fields, $text) = $this->getQuery('ends_with');
+            case self::PARAMETER_ENDS_WITH: return "%{$text}";
 
-        if (empty($text)) {
-            return false;
+            case self::PARAMETER_STARTS_WITH: return "{$text}%";
         }
-
-        $data->text = "%{$text}";
-        $data->fields = $fields;
-
-        $this->values[] = $data;
     }
 
-    public function contains()
+    private function getQuery(string $parameter)
     {
-        $data = new stdClass();
+        $data = Request::query($parameter);
 
-        list($fields, $text) = $this->getQuery('contains');
-
-        if (empty($text)) {
-            return false;
-        }
-
-        $data->text = "%{$text}%";
-        $data->fields = $fields;
-
-        $this->values[] = $data;
-    }
-
-    private function getQuery(string $getParam)
-    {
-        $data = Request::query($getParam);
-        $fields = [];
-        $text = null;
-
-        if (!is_array($data) and !is_array_assoc($data)) {
+        if (!is_array_assoc($data)) {
             return [[], null];
         }
-        $fields = to_list($data['fields'] ?? []);
-        $text = $data['text'] ?? null;
 
-        if (trim($text)) {
-            $text = str_replace(["'"], ["''"], trim($text));
-        }
-
-        return [$fields, $text];
-    }
-
-    private function sanatizeField(string $field): string
-    {
-        return str_replace(
-            '""',
-            '"',
-            '"' . str_replace('.', '"."', $field) . '"'
-        );
+        return [to_list($data[self::KEY_ITEMS]), to_str($data[self::KEY_TEXT])];
     }
 }
