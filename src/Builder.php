@@ -122,7 +122,7 @@ class Builder extends BaseBuilder
      *
      * @param callable(Item): void $callback
      */
-    public function casts(Closure $callback): self
+    public function casts(callable $callback): self
     {
         $this->castCallback = $callback;
 
@@ -136,13 +136,12 @@ class Builder extends BaseBuilder
     {
         $this->prepareQuery();
 
-        return new Collection(
+        return (new Collection(
             $this->paginateBag->paginate
                 ? $this->getPagination()
                 : $this->get(),
-            array_keys($this->attributes['columns']),
-            $this->castCallback
-        );
+            array_keys($this->attributes['columns'])
+        ))->setCasts($this->castCallback);
     }
 
     public function item(): Item

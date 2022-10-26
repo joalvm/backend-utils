@@ -6,12 +6,9 @@ use Closure;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection as BaseCollection;
-use Joalvm\Utils\Traits\Schematizable;
 
 class Collection extends BaseCollection
 {
-    use Schematizable;
-
     /**
      * Contiene la estructura para cada item de la colección.
      *
@@ -79,10 +76,9 @@ class Collection extends BaseCollection
 
     public function first(callable $callback = null, $default = null)
     {
-        return $this->schematize(
-            Arr::first($this->items, $callback, $default),
-            $this->casts
-        );
+        return (
+            new Item(Arr::first($this->items, $callback, $default))
+        )->schematize($this->casts);
     }
 
     public function each(callable $callback): self
@@ -97,11 +93,9 @@ class Collection extends BaseCollection
     /**
      * Set the value of casts.
      *
-     * @param null|Closure $casts
-     *
      * @return self
      */
-    public function setCasts($casts)
+    public function setCasts(?callable $casts)
     {
         $this->casts = $casts;
 
@@ -117,9 +111,7 @@ class Collection extends BaseCollection
     {
         return $this->isPaginate
             ? Arr::except(
-                $this->paginate->setCollection(
-                    collect($this->getAll(parent::all()))
-                )->toArray(),
+                $this->paginate->setCollection(collect($this->getAll(parent::all())))->toArray(),
                 [
                     'links',
                     'first_page_url',
@@ -134,8 +126,12 @@ class Collection extends BaseCollection
 
     private function getAll(array $items): array
     {
-        return array_map(function ($item) {
-            return $this->schematize($item, $this->casts);
-        }, $items);
+        foreach ($items as &$item) {
+            $item = new Item($item);
+
+            $item->schematize($this->casts);
+        }
+
+        return $items;
     }
 }

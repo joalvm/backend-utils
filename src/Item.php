@@ -3,7 +3,6 @@
 namespace Joalvm\Utils;
 
 use ArrayAccess;
-use Closure;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Support\Arr;
@@ -97,7 +96,7 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
     /**
      * Estructurar la consulta.
      */
-    public function schematize(Closure $callback = null): self
+    public function schematize(callable $callback = null): self
     {
         /** @var array|stdClass */
         $origin = $this->attributes;
@@ -114,13 +113,89 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
             }
         }
 
-        if (!is_null($callback)) {
-            $callback($this);
-        }
-
         $this->attributes = $this->cleanSchematizedValues($this->attributes);
 
+        if (!is_null($callback)) {
+            call_user_func($callback, $this);
+        }
+
         return $this;
+    }
+
+    /**
+     * Permite pasar una funcion para casteo custom.
+     */
+    public function cast(callable $fn, array $keys): void
+    {
+        foreach ($keys as $key) {
+            if ($this->has($key)) {
+                call_user_func($fn, $this->get($key));
+            }
+        }
+    }
+
+    /**
+     * Castea todos las keys a valores enteros.
+     *
+     * @param string[] $keys
+     */
+    public function ints(array $keys): void
+    {
+        foreach ($keys as $key) {
+            if (!$this->has($key)) {
+                continue;
+            }
+
+            $this->set($key, to_int($this->get($key)));
+        }
+    }
+
+    /**
+     * Castea todos las keys a valores flotantes.
+     *
+     * @param string[] $keys
+     */
+    public function floats(array $keys): void
+    {
+        foreach ($keys as $key) {
+            if (!$this->has($key)) {
+                continue;
+            }
+
+            $this->set($key, to_float($this->get($key)));
+        }
+    }
+
+    /**
+     * Castea todos las keys a valores boleanos.
+     *
+     * @param string[] $keys
+     */
+    public function bools(array $keys): void
+    {
+        foreach ($keys as $key) {
+            if (!$this->has($key)) {
+                continue;
+            }
+
+            $this->set($key, to_bool($this->get($key)));
+        }
+    }
+
+    /**
+     * Castea todos las keys de un json a array asociativos.
+     *
+     * @param string[] $keys
+     */
+    public function jsons(array $keys)
+    {
+        foreach ($keys as $key) {
+            if (!$this->has($key)) {
+                continue;
+            }
+
+            $this->set($key, json_decode($this->get($key), true));
+        }
     }
 
     /**
