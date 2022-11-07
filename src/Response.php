@@ -2,13 +2,8 @@
 
 namespace Joalvm\Utils;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Contracts\Pagination\Paginator;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Response as BaseResponse;
-use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Validation\ValidationException;
-use Joalvm\Utils\Exceptions\NotFoundException;
 use Joalvm\Utils\Exceptions\UnprocessableEntityException;
 
 class Response extends BaseResponse
@@ -54,7 +49,7 @@ class Response extends BaseResponse
         ?string $message = null
     ) {
         if (self::isEmptyContent($content) and self::HTTP_OK === $statusCode) {
-            return self::catch(new NotFoundException());
+            return new static(null, self::HTTP_NOT_FOUND);
         }
 
         return new static($content, $statusCode, $message);
@@ -72,7 +67,7 @@ class Response extends BaseResponse
 
     public static function destroyed($content, ?string $message = null)
     {
-        return self::updated(['deleted' => $content], $message);
+        return self::updated($content, $message);
     }
 
     /**
@@ -103,20 +98,23 @@ class Response extends BaseResponse
 
     private function normalizeContent($content, $httpCode, ?string $message = null)
     {
-        return array_merge(
-            [
-                'error' => !$this->isSuccessfulCode($httpCode),
-                'message' => (
-                    empty($message)
-                    ? strtoupper(self::$statusTexts[$httpCode])
-                    : $message
-                ),
-                'code' => $httpCode,
-            ],
-            (is_a($content, Collection::class) and $content->isPagination())
-                ? $content->toArray()
-                : ['data' => $content]
-        );
+        $body = [
+            'error' => !$this->isSuccessfulCode($httpCode),
+            'message' => $message ?: self::$statusTexts[$httpCode],
+            'code' => $httpCode,
+        ];
+
+        if ($content instanceof Collection) {
+            $body['data'] = $content->toArray();
+
+            if ($content->isPagination()) {
+                $body['meta'] = $content->getMetadata();
+            }
+
+            return $body;
+        }
+
+        return array_merge($body, ['data' => $content]);
     }
 
     private static function normalizeHttpCode($statusCode)
@@ -134,30 +132,20 @@ class Response extends BaseResponse
     {
         $empty = false;
 
-        if (self::isPaginator($content) || self::isCollection($content)) {
-            $empty = $content->isEmpty();
-        } else {
-            $empty = empty($content);
+        if ($content instanceof \Countable) {
+            return 0 === count($content);
         }
 
-        return $empty;
-    }
+        if (is_object($content) and method_exists($content, 'isEmpty')) {
+            return $content->isEmpty();
+        }
 
-    private static function isPaginator($data)
-    {
-        return $data instanceof Paginator || $data instanceof LengthAwarePaginator;
+        return empty($empty);
     }
 
     private static function isValidatorException($ex): bool
     {
         return $ex instanceof UnprocessableEntityException
         || $ex instanceof ValidationException;
-    }
-
-    private static function isCollection($data): bool
-    {
-        return
-            ($data instanceof BaseCollection)
-            || ($data instanceof EloquentCollection);
     }
 }

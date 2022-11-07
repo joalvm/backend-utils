@@ -21,47 +21,66 @@ class Collection extends BaseCollection
      */
     protected $casts;
 
+    /**
+     * Indica si la colección está paginada.
+     *
+     * @var bool
+     */
     private $isPaginate = false;
 
-    private $paginate;
+    /**
+     * Contiene la metadata de la colección cuando está paginada.
+     *
+     * @var array
+     */
+    private $metadata;
 
     /**
      * @param BaseCollection|LengthAwarePaginator $items
      */
     public function __construct($items, array $schema = [])
     {
+        parent::__construct($this->normalizeData($items));
+
         $this->schema = $schema;
+    }
 
-        $this->isPaginate = $items instanceof LengthAwarePaginator;
+    public function normalizeData($items): array
+    {
+        if ($items instanceof LengthAwarePaginator) {
+            $this->isPaginate = true;
+            $this->metadata = [
+                'per_page' => $items->perPage(),
+                'current_page' => $items->currentPage(),
+                'from' => $items->firstItem(),
+                'last_page' => $items->lastPage(),
+                'per_page' => $items->perPage(),
+                'to' => $items->lastItem(),
+                'total' => $items->total(),
+            ];
 
-        parent::__construct(
-            $this->isPaginate
-                ? $items->items()
-                : (is_array($items) ? $items : $items->items)
-        );
-
-        if ($this->isPaginate) {
-            $this->paginate = $items->setCollection(collect());
+            return $items->getCollection()->all();
         }
+
+        if ($items instanceof BaseCollection) {
+            return $items->all();
+        }
+
+        if ($items instanceof \ArrayAccess) {
+            return $items;
+        }
+
+        return [];
     }
 
     public function all()
     {
-        return $this->isPaginate
-            ? Arr::except(
-                $this->paginate->setCollection(
-                    collect($this->getAll(parent::all()))
-                )->toArray(),
-                [
-                    'links',
-                    'first_page_url',
-                    'last_page_url',
-                    'path',
-                    'next_page_url',
-                    'prev_page_url',
-                ]
-            )
-            : $this->getAll(parent::all());
+        return $this->getAll(parent::all());
+    }
+
+    public function getMetadata(): ?array
+    {
+        return $this->metadata;
     }
 
     /**
@@ -76,9 +95,9 @@ class Collection extends BaseCollection
 
     public function first(callable $callback = null, $default = null)
     {
-        return (
-            new Item(Arr::first($this->items, $callback, $default))
-        )->schematize($this->casts);
+        return (new Item(Arr::first($this->items, $callback, $default)))
+            ->schematize($this->casts)
+        ;
     }
 
     public function each(callable $callback): self
@@ -105,23 +124,6 @@ class Collection extends BaseCollection
     public function isPagination(): bool
     {
         return $this->isPaginate;
-    }
-
-    protected function normalizeData()
-    {
-        return $this->isPaginate
-            ? Arr::except(
-                $this->paginate->setCollection(collect($this->getAll(parent::all())))->toArray(),
-                [
-                    'links',
-                    'first_page_url',
-                    'last_page_url',
-                    'path',
-                    'next_page_url',
-                    'prev_page_url',
-                ]
-            )
-            : $this->getAll(parent::all());
     }
 
     private function getAll(array $items): array

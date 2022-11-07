@@ -3,6 +3,7 @@
 namespace Joalvm\Utils;
 
 use ArrayAccess;
+use Countable;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Support\Arr;
@@ -10,7 +11,7 @@ use JsonSerializable;
 use stdClass;
 use Stringable;
 
-class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, Stringable
+class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, Stringable, Countable
 {
     /**
      * Todos los atributos establecidos en la instancia del Item.
@@ -91,6 +92,11 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
     public function __unset($key)
     {
         $this->offsetUnset($key);
+    }
+
+    public function count(): int
+    {
+        return count(array_keys($this->attributes));
     }
 
     /**
