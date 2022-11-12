@@ -105,11 +105,14 @@ class Search
     private function wrap(string $filter, $text)
     {
         switch ($filter) {
-            case self::PARAMETER_CONTAINS: return "%{$text}%";
+            case self::PARAMETER_CONTAINS:
+                return "%{$text}%";
 
-            case self::PARAMETER_ENDS_WITH: return "%{$text}";
+            case self::PARAMETER_ENDS_WITH:
+                return "%{$text}";
 
-            case self::PARAMETER_STARTS_WITH: return "{$text}%";
+            case self::PARAMETER_STARTS_WITH:
+                return "{$text}%";
         }
     }
 
@@ -118,6 +121,13 @@ class Search
         $data = Request::query($parameter);
 
         if (!is_array_assoc($data)) {
+            return [[], null];
+        }
+
+        if (
+            !array_key_exists(self::KEY_ITEMS, $data)
+            or !array_key_exists(self::KEY_TEXT, $data)
+        ) {
             return [[], null];
         }
 

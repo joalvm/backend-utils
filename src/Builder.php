@@ -16,11 +16,25 @@ use Joalvm\Utils\Request\Sort;
 
 class Builder extends BaseBuilder
 {
-    protected $attributes = [
-        'columns' => [],
-        'from' => [],
-    ];
+    /**
+     * Schema de la consulta.
+     *
+     * @var array
+     */
+    protected $schema = [];
 
+    /**
+     * El alias que se definió para el from.
+     *
+     * @var string
+     */
+    protected $fromAlias = '';
+
+    /**
+     * Indica si el schema puede ser filtrado.
+     *
+     * @var bool
+     */
     private $filterable = true;
 
     /**
@@ -81,11 +95,9 @@ class Builder extends BaseBuilder
             $alias = $as;
         }
 
-        $this->attributes['from'] = [$table, $alias];
+        $this->fromAlias = $alias ?: '';
 
-        $this->from = "{$table} as {$alias}";
-
-        return $this;
+        return parent::from($table, $alias);
     }
 
     public function whereIn($column, $values, $boolean = 'and', $not = false): self
@@ -104,13 +116,9 @@ class Builder extends BaseBuilder
 
     public function schema($columns = ['*'])
     {
-        $this->attributes['columns'] = $this->resolveSchema(
-            $columns,
-            '',
-            $this->attributes['from'][1] ?? ''
-        );
+        $this->schema = $this->resolveSchema($columns, $this->fromAlias);
 
-        $this->schemaBag->loadItems($this->attributes['columns']);
+        $this->schemaBag->loadItems($this->schema);
         $this->sortBag->loadSchema($this->schemaBag);
         $this->searchBag->loadSchema($this->schemaBag);
 
@@ -140,7 +148,7 @@ class Builder extends BaseBuilder
             $this->paginateBag->paginate
                 ? $this->getPagination()
                 : $this->get(),
-            array_keys($this->attributes['columns'])
+            array_keys($this->schema)
         ))->setCasts($this->castCallback);
     }
 
@@ -162,7 +170,7 @@ class Builder extends BaseBuilder
 
         return new Collection(
             $this->getPagination(),
-            array_keys($this->attributes['columns']),
+            array_keys($this->schema),
             $this->castCallback
         );
     }
@@ -224,37 +232,36 @@ class Builder extends BaseBuilder
 
     private function resolveTableAlias(string $tableName): array
     {
-        $tableName = str_replace(' as ', ' AS ', $tableName);
+        $split = explode(' as ', str_replace(' AS ', ' as ', $tableName));
 
-        return (2 == count($parts = explode(' AS ', $tableName)))
-            ? $parts
-            : (
-                2 == count($parts = explode(' ', $tableName))
-                    ? $parts
-                    : [$tableName, $tableName]
-            );
+        if (2 === count($split)) {
+            return [to_str($split[0]), to_str($split[1])];
+        }
+
+        return [$tableName, $tableName];
     }
 
     private function resolveSchema(
-        array $fields,
-        string $preffix = '',
-        string $aliasTable = ''
+        array $columns,
+        string $aliasTable,
+        string $preffix = ''
     ) {
         $nfields = [];
 
-        foreach ($fields as $aliasColumn => $field) {
+        foreach ($columns as $aliasColumn => $column) {
             $params = [
-                'field' => $field,
+                'field' => $column,
                 'preffix' => $preffix,
                 'aliasTable' => $aliasTable,
                 'aliasColumn' => $aliasColumn,
             ];
 
-            if (is_string($field)) {
-                $pfield = explode('.', $field);
-                if (2 === count($pfield)) {
-                    $params['aliasTable'] = $pfield[0];
-                    $params['field'] = $pfield[1];
+            if (is_string($column)) {
+                $parts = to_list($column, true, '.');
+
+                if (2 === count($parts)) {
+                    $params['aliasTable'] = $parts[0];
+                    $params['field'] = $parts[1];
                 }
             }
 
@@ -263,13 +270,16 @@ class Builder extends BaseBuilder
                     $nfields,
                     $this->resolveField($params)
                 );
-            } elseif (is_string($aliasColumn)) {
-                if (is_array($field)) {
-                    $parts = explode(':', $aliasColumn);
+
+                continue;
+            }
+
+            if (is_string($aliasColumn)) {
+                if (is_array($column)) {
+                    $parts = to_list($aliasColumn, false, ':');
                     $ast = '';
 
                     if (2 == count($parts)) {
-                        $parts = array_map('trim', $parts);
                         if (false !== strpos($parts[1], '.*')) {
                             $parts[1] = str_replace('.*', '', $parts[0]);
                             $ast = '.*';
@@ -279,17 +289,19 @@ class Builder extends BaseBuilder
                     $nfields = array_merge(
                         $nfields,
                         $this->resolveSchema(
-                            $field,
-                            self::setPreffix($preffix, $parts[0] . $ast),
-                            2 == count($parts) ? $parts[1] : $aliasTable
+                            $column,
+                            2 == count($parts) ? $parts[1] : $aliasTable,
+                            self::setPreffix($preffix, $parts[0] . $ast)
                         )
                     );
-                } else {
-                    $nfields = array_merge(
-                        $nfields,
-                        $this->resolveField($params)
-                    );
+
+                    continue;
                 }
+
+                $nfields = array_merge(
+                    $nfields,
+                    $this->resolveField($params)
+                );
             }
         }
 

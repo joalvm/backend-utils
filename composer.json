@@ -1,6 +1,6 @@
 {
     "name": "joalvm/backend-utils",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "description": "Laravel Backend API utils",
     "type": "library",
     "keywords": [
@@ -39,7 +39,8 @@
         },
         "files": [
             "src/Helpers/utils.php",
-            "src/Helpers/parsing.php"
+            "src/Helpers/parsing.php",
+            "src/Helpers/casts.php"
         ]
     },
     "autoload-dev": {
