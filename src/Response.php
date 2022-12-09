@@ -130,8 +130,6 @@ class Response extends BaseResponse
 
     private static function isEmptyContent($content): bool
     {
-        $empty = false;
-
         if ($content instanceof \Countable) {
             return 0 === count($content);
         }
@@ -140,7 +138,7 @@ class Response extends BaseResponse
             return $content->isEmpty();
         }
 
-        return empty($empty);
+        return empty($content);
     }
 
     private static function isValidatorException($ex): bool
