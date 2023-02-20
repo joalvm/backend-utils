@@ -10,3 +10,4 @@
 /index.php          export-ignore
 /progress           export-ignore
 /composer.lock      export-ignore
+/tests              export-ignore

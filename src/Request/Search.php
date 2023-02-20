@@ -67,18 +67,25 @@ class Search
                         continue;
                     }
 
-                    $quoted = $this->grammar->quoteString($value[self::KEY_TEXT]);
-                    $stmText = "{$quoted}::text";
-                    $stmColumn = "{$item}::text";
+                    $text = $this->grammar->quoteString(
+                        $this->wrap($value['type'], $value[self::KEY_TEXT])
+                    );
+                    $column = "({$item})::text";
                     $operator = 'ilike';
 
+                    // No todas las db tienen la sentencia 'ilike'
                     if (!in_array('ilike', $this->grammar->getOperators())) {
-                        $stmText = "LOWER({$quoted}::text)";
-                        $stmColumn = "LOWER({$item}::text)";
+                        $text = $this->grammar->quoteString($this->wrap(
+                            $value['type'],
+                            mb_strtolower($value[self::KEY_TEXT], 'UTF-8')
+                        ));
+                        $column = "LOWER({$column})";
                         $operator = 'like';
                     }
 
-                    $query->orWhere(DB::raw($stmColumn), $operator, DB::raw($stmText));
+                    $query->orWhereRaw(
+                        sprintf('%s %s %s', $column, $operator, $text)
+                    );
                 }
             });
         }
@@ -89,15 +96,16 @@ class Search
         foreach (self::ALLOWED_PARAMETERS as $parameter) {
             list($items, $text) = $this->getQuery($parameter);
 
+            $text = sanitize_str($text);
+
             if (!$text or !$items) {
                 continue;
             }
 
-            $text = sanitize_str($text);
-
             array_push($this->values, [
+                'type' => $parameter,
                 self::KEY_ITEMS => $items,
-                self::KEY_TEXT => $this->wrap($parameter, $text),
+                self::KEY_TEXT => $text,
             ]);
         }
     }
@@ -105,11 +113,14 @@ class Search
     private function wrap(string $filter, $text)
     {
         switch ($filter) {
-            case self::PARAMETER_CONTAINS: return "%{$text}%";
+            case self::PARAMETER_CONTAINS:
+                return "%{$text}%";
 
-            case self::PARAMETER_ENDS_WITH: return "%{$text}";
+            case self::PARAMETER_ENDS_WITH:
+                return "%{$text}";
 
-            case self::PARAMETER_STARTS_WITH: return "{$text}%";
+            case self::PARAMETER_STARTS_WITH:
+                return "{$text}%";
         }
     }
 
@@ -118,7 +129,14 @@ class Search
         $data = Request::query($parameter);
 
         if (!is_array_assoc($data)) {
-            return [[], null];
+            return [[], ''];
+        }
+
+        if (
+            !array_key_exists(self::KEY_ITEMS, $data)
+            or !array_key_exists(self::KEY_TEXT, $data)
+        ) {
+            return [[], ''];
         }
 
         return [to_list($data[self::KEY_ITEMS]), to_str($data[self::KEY_TEXT])];
