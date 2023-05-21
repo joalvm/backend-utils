@@ -86,6 +86,8 @@ class Response extends BaseResponse
         // en el metodo getStatusCode
         if (method_exists($ex, 'getStatusCode')) {
             $httpCode = call_user_func([$ex, 'getStatusCode']);
+        } elseif (method_exists($ex, 'status')) {
+            $httpCode = call_user_func([$ex, 'status']);
         }
 
         if (self::isValidatorException($ex)) {
