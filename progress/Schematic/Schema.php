@@ -5,7 +5,6 @@ namespace Joalvm\Utils\Schematic;
 use Joalvm\Utils\Schematic\Grammars\Grammar;
 use Joalvm\Utils\Schematic\Types\Type;
 use Joalvm\Utils\Schematic\Types\UnknownType;
-use ReflectionClass;
 
 class Schema
 {
@@ -212,7 +211,7 @@ class Schema
     {
         if (!$type instanceof Type) {
             /** @var Type $type */
-            $type = (new ReflectionClass($this->defaultType))->newInstanceArgs([$type]);
+            $type = (new \ReflectionClass($this->defaultType))->newInstanceArgs([$type]);
         }
 
         $type->setAs($this->makeColumnAs($name));

@@ -20,9 +20,9 @@ class Paginate
 
     protected $maxPerPage = self::MAX_PER_PAGE;
 
-    public function __construct()
+    public function __construct(array $parameters)
     {
-        $bag = new ParameterBag($_GET);
+        $bag = new ParameterBag($parameters);
 
         $this->paginate = $bag->getBoolean(self::PARAMETER_PAGINATE, true);
 
@@ -44,6 +44,24 @@ class Paginate
         return $this;
     }
 
+    public function setPage(int $page = self::DEFAULT_PAGE): self
+    {
+        if ($page >= self::DEFAULT_PAGE) {
+            $this->page = $page;
+        }
+
+        return $this;
+    }
+
+    public function setPerPage(int $perPage = self::DEFAULT_PER_PAGE): self
+    {
+        if ($perPage > 0 and $perPage <= $this->maxPerPage) {
+            $this->perPage = $perPage;
+        }
+
+        return $this;
+    }
+
     protected function handlePage(ParameterBag $bag): void
     {
         $page = $bag->getInt('offset', self::DEFAULT_PAGE);
@@ -52,9 +70,7 @@ class Paginate
             $page = $bag->getInt(self::PARAMETER_PAGE, self::DEFAULT_PAGE);
         }
 
-        if ($page >= self::DEFAULT_PAGE) {
-            $this->page = $page;
-        }
+        $this->setPage($page);
     }
 
     protected function handlePerPage(ParameterBag $bag): void
@@ -68,8 +84,6 @@ class Paginate
             );
         }
 
-        if ($perPage > 0 and $perPage <= $this->maxPerPage) {
-            $this->perPage = $perPage;
-        }
+        $this->setPerPage($perPage);
     }
 }

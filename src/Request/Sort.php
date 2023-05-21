@@ -2,9 +2,7 @@
 
 namespace Joalvm\Utils\Request;
 
-use Illuminate\Database\Query\Grammars\Grammar;
 use Illuminate\Support\Facades\Request;
-use Joalvm\Utils\Builder;
 use Symfony\Component\HttpFoundation\ParameterBag;
 
 class Sort extends ParameterBag
@@ -18,69 +16,29 @@ class Sort extends ParameterBag
     public const DEFAULT_ORDER = self::ORDER_ASC;
 
     /**
-     * Dependecia de la clase Fields que permite obtner
-     * la lista de columnas que estan permitidas.
-     *
-     * @var Schema
-     */
-    protected $schema;
-
-    /**
      * Los short=>order obtenidos.
      *
      * @var array
      */
     protected $values = [];
 
-    /**
-     * Grammar del builder.
-     *
-     * @var Grammar
-     */
-    private $grammar;
-
-    public function __construct(Grammar $grammar)
+    public function __construct()
     {
-        $this->grammar = $grammar;
-
         parent::__construct(
             $this->normalizeParameter(Request::query(self::PARAMETER_SORT, []))
         );
     }
 
-    public function loadSchema(Schema $schema)
-    {
-        $this->schema = $schema;
-    }
-
-    public function getValues()
-    {
-        return $this->filterInSchema();
-    }
-
-    public function run(Builder &$builder)
-    {
-        foreach ($this->filterInSchema() as $order) {
-            $builder->orderBy($order['column'], $order['mode']);
-        }
-    }
-
-    protected function filterInSchema(): array
+    public function getValues(Schema $schema): array
     {
         $values = [];
+        $items = $schema->getColumnsOrAlias(array_keys($this->parameters));
 
-        if (!$this->schema) {
-            return [];
-        }
-
-        foreach ($this->parameters as $item => $order) {
-            $sitem = $this->schema->getColumnOrAlias($item);
-
-            if (!$sitem) {
-                continue;
-            }
-
-            array_push($values, ['column' => $sitem, 'mode' => $order]);
+        foreach ($items as $alias => $item) {
+            $values[] = [
+                'column' => $item,
+                'order' => $this->parameters[$alias],
+            ];
         }
 
         return $values;
@@ -101,18 +59,19 @@ class Sort extends ParameterBag
             $sorts = to_list($sorts);
         }
 
-        foreach ($sorts as $schemaItem => $order) {
-            $item = $schemaItem;
+        foreach ($sorts as $item => $order) {
+            $item = $item;
             $mode = to_str($order);
 
-            if (is_numeric($schemaItem)) {
-                $parts = explode(' ', $mode);
+            // Si el item es numerico entonces se asume que es un array list.
+            if (is_numeric($item)) {
+                $parts = to_list($mode, true, ' ');
 
                 $item = $parts[0];
                 $mode = $this->orderMode($parts[1] ?? '');
             }
 
-            if (is_string($schemaItem)) {
+            if (is_string($item)) {
                 $mode = $this->orderMode($mode);
             }
 

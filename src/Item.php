@@ -2,16 +2,11 @@
 
 namespace Joalvm\Utils;
 
-use ArrayAccess;
-use Countable;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Support\Arr;
-use JsonSerializable;
-use stdClass;
-use Stringable;
 
-class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, Stringable, Countable
+class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Stringable, \Countable
 {
     /**
      * Todos los atributos establecidos en la instancia del Item.
@@ -104,7 +99,7 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
      */
     public function schematize(callable $callback = null): self
     {
-        /** @var array|stdClass */
+        /** @var array|\stdClass */
         $origin = $this->attributes;
 
         $this->attributes = [];
@@ -112,7 +107,7 @@ class Item implements Arrayable, ArrayAccess, Jsonable, JsonSerializable, String
         foreach ($origin as $key => $value) {
             $this->set($key, $value);
 
-            if ($origin instanceof stdClass) {
+            if ($origin instanceof \stdClass) {
                 unset($origin->{$key});
             } else {
                 unset($origin[$key]);

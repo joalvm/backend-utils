@@ -2,12 +2,10 @@
 
 namespace Joalvm\Utils\Schematic;
 
-use InvalidArgumentException;
 use Joalvm\Utils\Schematic\Grammars\Grammar;
 use Joalvm\Utils\Schematic\Grammars\PgsqlGrammar;
 use Joalvm\Utils\Schematic\Types\Type;
 use Joalvm\Utils\Schematic\Types\UnknownType;
-use PDO;
 
 class SchemaManager
 {
@@ -73,7 +71,7 @@ class SchemaManager
     public function setDefaultType(string $type)
     {
         if (!is_a($type, Type::class, true)) {
-            throw new InvalidArgumentException('The type must be an instance of Type');
+            throw new \InvalidArgumentException('The type must be an instance of Type');
         }
 
         $this->defaultType = $type;
@@ -81,8 +79,8 @@ class SchemaManager
 
     public function setPdoDriver(string $pdoDriver)
     {
-        if (!in_array($pdoDriver, PDO::getAvailableDrivers())) {
-            throw new InvalidArgumentException('PDO driver not found');
+        if (!in_array($pdoDriver, \PDO::getAvailableDrivers())) {
+            throw new \InvalidArgumentException('PDO driver not found');
         }
 
         $this->pdoDriver = $pdoDriver;
