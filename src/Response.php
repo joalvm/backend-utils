@@ -80,7 +80,7 @@ class Response extends BaseResponse
     {
         $httpCode = $ex->getCode();
         $message = $ex->getMessage();
-        $content = $ex->getTrace();
+        $content = null;
 
         // Las excepciones de laravel guardan los codigo en
         // en el metodo getStatusCode
