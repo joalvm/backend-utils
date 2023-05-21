@@ -86,14 +86,14 @@ class Response extends BaseResponse
         // en el metodo getStatusCode
         if (method_exists($ex, 'getStatusCode')) {
             $httpCode = call_user_func([$ex, 'getStatusCode']);
-        } elseif (method_exists($ex, 'status')) {
-            $httpCode = call_user_func([$ex, 'status']);
         }
 
         if (self::isValidatorException($ex)) {
             $httpCode = self::HTTP_UNPROCESSABLE_ENTITY;
             $content = $ex->errors();
             $message = $ex->getMessage(); // Respuesta custom
+        } elseif (method_exists($ex, 'status')) {
+            $httpCode = call_user_func([$ex, 'status']);
         }
 
         return new static($content, $httpCode, $message);
