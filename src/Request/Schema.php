@@ -3,57 +3,111 @@
 namespace Joalvm\Utils\Request;
 
 use Illuminate\Database\Query\Expression;
+use Illuminate\Database\Query\Grammars\Grammar;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
-use Joalvm\Utils\Builder;
+use Illuminate\Support\Facades\Request;
 use Symfony\Component\HttpFoundation\ParameterBag;
 
 class Schema extends ParameterBag
 {
     public const PARAMETER_SCHEMA = 'schema';
 
+    /**
+     * Prefijo de la tabla principal que se encuntra definido en el from.
+     *
+     * @var string
+     */
+    protected $fromAs = '';
+
+    /**
+     * Items del schema.
+     */
     protected $items = [];
 
-    protected $filterable = true;
+    /**
+     * Matches del schema.
+     */
+    protected $matches = [];
 
-    public function __construct()
+    /**
+     * Claves del schema.
+     */
+    protected $keys = [];
+
+    /**
+     * @var Grammar
+     */
+    private $grammar;
+
+    public function __construct(Grammar $grammar)
     {
         parent::__construct($this->catchParameters());
+
+        $this->generateMatches();
+
+        $this->grammar = $grammar;
     }
 
-    public function catchParameters(): array
+    public function setFromAs(string $alias): self
     {
-        $parameters = Arr::get($_GET, self::PARAMETER_SCHEMA, []);
+        $this->fromAs = $alias;
 
-        if (is_string($parameters)) {
-            $parameters = to_list($parameters);
-        }
-
-        return array_map('sanitize_str', to_list($parameters));
-    }
-
-    public function setFilterable(bool $filterable = true): self
-    {
-        $this->filterable = $filterable;
+        $this->items = $this->generateSchema($this->items, $alias);
 
         return $this;
     }
 
-    public function loadItems(array $items): self
+    public function setItems(array $items): self
     {
-        $this->items = $items;
+        $this->items = $this->generateSchema($items, $this->fromAs);
 
         return $this;
     }
 
     public function getValues()
     {
-        return $this->parameters;
+        $columns = [];
+
+        foreach ($this->filterItemKeys() as $as) {
+            $column = $this->items[$as];
+
+            if ($this->isQueryable($column) or $column instanceof Expression) {
+                $columns[] = [$column, $as];
+
+                continue;
+            }
+
+            $columns[] = sprintf('%s as "%s"', $this->grammar->wrapTable($column), $as);
+        }
+
+        return $columns;
     }
 
-    public function exists(string $field): bool
+    public function filterItemKeys()
     {
-        return array_key_exists($field, $this->items);
+        $keys = [];
+
+        // Si no se ha filtrado el esqueema, se retornan todas las claves.
+        if (!$this->matches) {
+            return $this->keys;
+        }
+
+        foreach ($this->matches as $match) {
+            $keys = array_merge($keys, preg_grep($match, $this->keys));
+        }
+
+        return $keys;
+    }
+
+    public function getKeys(): array
+    {
+        return $this->keys;
+    }
+
+    public function exists(string $key): bool
+    {
+        return in_array($key, $this->keys);
     }
 
     /**
@@ -64,111 +118,238 @@ class Schema extends ParameterBag
     public function getItem(string $item)
     {
         if ($this->exists($item)) {
-            return $this->items[$item];
+            return Arr::get($this->items, $item);
         }
 
         return null;
     }
 
-    public function getColumnOrAlias(string $alias)
+    public function getColumns(array $keys): array
     {
-        if (!$this->exists($alias)) {
-            return null;
-        }
+        $columns = [];
 
-        $item = $this->getItem($alias);
-
-        if (is_object($item) or is_callable($item)) {
-            return $alias;
-        }
-
-        if (is_string($item) and !$this->isColumnable($item)) {
-            return $alias;
-        }
-
-        return $item;
-    }
-
-    public function getColumnableItem(string $alias): ?string
-    {
-        if (!$this->exists($alias)) {
-            return null;
-        }
-
-        $item = $this->getItem($alias);
-
-        if (is_string($item) and $this->isColumnable($item)) {
-            return $item;
-        }
-
-        return null;
-    }
-
-    public function isColumnable(string $column): bool
-    {
-        return preg_match('/^[a-z](([a-z0-9_]+)?\.{1})?[a-z0-9_]+$/i', $column);
-    }
-
-    public function run(Builder &$builder): void
-    {
-        if ($this->filterable) {
-            $columns = $this->getFilteredColumns();
-
-            if (empty($columns)) {
-                $columns = $this->items;
+        foreach ($keys as $key) {
+            if ($this->isACorrectColumnName($item = $this->getItem($key))) {
+                $columns[] = $item;
             }
         }
 
-        foreach ($columns as $key => $value) {
-            if (is_string($value) or $value instanceof Expression) {
-                if (Builder::isColumnAlias($value)) {
-                    $builder->addSelect(sprintf('%s as %s', $value, $key));
-                } else {
-                    $builder->selectRaw(
-                        sprintf('%s as "%s"', $value, str_replace('"', '', $key))
-                    );
-                }
+        return $columns;
+    }
+
+    public function getColumnsOrValues(array $keys): array
+    {
+        $columns = [];
+
+        foreach ($keys as $key) {
+            $item = $this->getItem($key);
+
+            if ($this->isACorrectColumnName($item)) {
+                $columns[$key] = $item;
 
                 continue;
             }
 
-            $builder->selectSub($value, DB::raw(sprintf('"%s"', $key)));
+            if ($item) {
+                $columns[$key] = $item;
+            }
         }
+
+        return $columns;
     }
 
-    protected function getFilteredColumns()
+    /**
+     * Obtiene la columna o el alias de la columna en caso de que sea una expresion.
+     *
+     * @param array<string,Expression|string> $keys
+     */
+    public function getColumnsOrAlias(array $keys): array
     {
-        $matches = $this->generateMatches();
+        $columns = [];
+        $filtered = $this->filterItemKeys();
 
-        return array_filter(
-            $this->items,
-            function ($key) use ($matches) {
-                foreach ($matches as $match) {
-                    if (preg_match($match, $key)) {
-                        return true;
-                    }
-                }
+        foreach ($keys as $key) {
+            if ($this->isACorrectColumnName($item = $this->getItem($key))) {
+                $columns[$key] = $item;
 
-                return false;
-            },
-            ARRAY_FILTER_USE_KEY
-        );
+                continue;
+            }
+
+            // Si no es nombre de columna correcta, debemos buscar entre los alias
+            // que esten el eschema filtrado, de lo contrario dara error.
+            if (in_array($key, $filtered)) {
+                $columns[$key] = DB::raw(sprintf('"%s"', $key));
+            }
+        }
+
+        return $columns;
+    }
+
+    private function generateSchema(array $items, string $alias)
+    {
+        if (!$items or !$alias) {
+            return $items;
+        }
+
+        $newItems = $this->schematize($items, '', $alias);
+        $this->keys = array_keys($newItems);
+
+        return $newItems;
     }
 
     /**
      * Gerar un array de expresiones regulares para field, la expresion
      * regular permite mantener la estructura separada por comas.
      */
-    protected function generateMatches(): array
+    private function generateMatches(): void
     {
-        return array_map(
-            function ($parameter) {
-                return sprintf(
-                    '/^%s/i',
-                    str_replace('*', '(?:[a-z._]+)', $parameter)
+        foreach ($this->parameters as $parameter) {
+            $this->matches[] = sprintf(
+                '/^%s/i',
+                str_replace('*', '(?:[a-z._]+)', $parameter)
+            );
+        }
+    }
+
+    private function catchParameters(): array
+    {
+        $parameters = Request::query(self::PARAMETER_SCHEMA, []);
+
+        if (is_string($parameters)) {
+            $parameters = to_list($parameters);
+        }
+
+        return array_map('sanitize_str', to_list($parameters));
+    }
+
+    private function schematize(?array $fields = [], ?string $preffix = '', ?string $aliasTable = ''): array
+    {
+        $nfields = [];
+
+        foreach ($fields as $aliasColumn => $field) {
+            $params = [
+                'field' => $field,
+                'preffix' => $preffix,
+                'aliasTable' => $aliasTable,
+                'aliasColumn' => $aliasColumn,
+            ];
+
+            if (is_string($field)) {
+                $pfield = explode('.', $field);
+                if (2 === count($pfield)) {
+                    $params['aliasTable'] = $pfield[0];
+                    $params['field'] = $pfield[1];
+                }
+            }
+
+            if (is_numeric($aliasColumn)) {
+                $nfields = array_merge(
+                    $nfields,
+                    $this->resolveField($params)
                 );
-            },
-            $this->parameters
+            } elseif (is_string($aliasColumn)) {
+                if (is_array($field)) {
+                    $parts = explode(':', $aliasColumn);
+                    $ast = '';
+
+                    if (2 == count($parts)) {
+                        $parts = array_map('trim', $parts);
+                        if (false !== strpos($parts[1], '.*')) {
+                            $parts[1] = str_replace('.*', '', $parts[0]);
+                            $ast = '.*';
+                        }
+                    }
+
+                    $nfields = array_merge(
+                        $nfields,
+                        $this->schematize(
+                            $field,
+                            $this->setPreffix($preffix, $parts[0] . $ast),
+                            2 == count($parts) ? $parts[1] : $aliasTable
+                        )
+                    );
+                } else {
+                    $nfields = array_merge(
+                        $nfields,
+                        $this->resolveField($params)
+                    );
+                }
+            }
+        }
+
+        return $nfields;
+    }
+
+    private function resolveField(array $params)
+    {
+        $field = is_string($params['field'])
+            ? trim($params['field'])
+            : $params['field'];
+
+        $key = '';
+        $value = '';
+
+        if ($field instanceof Expression or is_callable($field)) {
+            $key = $this->setPreffix($params['preffix'], $params['aliasColumn']);
+            $value = $field;
+        } elseif (is_string($field)) {
+            if ($this->isACorrectColumnName($field)) {
+                $key = $this->setPreffix(
+                    $params['preffix'],
+                    !is_numeric($params['aliasColumn'])
+                        ? $params['aliasColumn']
+                        : $field
+                );
+
+                $value = $this->setPreffix($params['aliasTable'], $field);
+            } else {
+                $key = $this->setPreffix($params['preffix'], $params['aliasColumn']);
+                $value = DB::raw("({$field})");
+            }
+        }
+
+        return [$key => $value];
+    }
+
+    private function setPreffix(?string $preffix, string $value): string
+    {
+        if (!empty($preffix)) {
+            return "{$preffix}.{$value}";
+        }
+
+        return $value;
+    }
+
+    /**
+     * Verifica que un nombre de columna sea correcto.
+     *
+     * Ejemplos:
+     * - column
+     * - column_with_underscore
+     * - table.column
+     * - table.column_with_underscore
+     * - alias.column
+     * - alias.colum_with_underscore.
+     *
+     * @param string $ColumnAlias
+     */
+    private function isACorrectColumnName($ColumnAlias): bool
+    {
+        if (!is_string($ColumnAlias) or !$ColumnAlias) {
+            return false;
+        }
+
+        return \preg_match(
+            '/^(([a-zA-Z])(\\w+)?\\.)?([a-zA-Z]\\w+|_)$/i',
+            $ColumnAlias
         );
+    }
+
+    private function isQueryable($value)
+    {
+        return $value instanceof \Illuminate\Database\Query\Builder
+                || $value instanceof \Illuminate\Database\Eloquent\Builder
+               || $value instanceof \Illuminate\Database\Eloquent\Relations\Relation
+               || $value instanceof \Closure;
     }
 }

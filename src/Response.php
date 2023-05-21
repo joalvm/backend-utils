@@ -5,6 +5,7 @@ namespace Joalvm\Utils;
 use Illuminate\Http\Response as BaseResponse;
 use Illuminate\Validation\ValidationException;
 use Joalvm\Utils\Exceptions\UnprocessableEntityException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 class Response extends BaseResponse
 {
@@ -79,7 +80,7 @@ class Response extends BaseResponse
     {
         $httpCode = $ex->getCode();
         $message = $ex->getMessage();
-        $content = null;
+        $content = $ex->getTrace();
 
         // Las excepciones de laravel guardan los codigo en
         // en el metodo getStatusCode
@@ -141,9 +142,11 @@ class Response extends BaseResponse
         return empty($content);
     }
 
-    private static function isValidatorException($ex): bool
+    private static function isValidatorException(\Throwable $ex): bool
     {
-        return $ex instanceof UnprocessableEntityException
-        || $ex instanceof ValidationException;
+        return
+            $ex instanceof ValidationException
+            or $ex instanceof UnprocessableEntityException
+            or $ex instanceof UnprocessableEntityHttpException;
     }
 }

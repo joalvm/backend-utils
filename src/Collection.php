@@ -2,7 +2,6 @@
 
 namespace Joalvm\Utils;
 
-use Closure;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection as BaseCollection;
@@ -17,7 +16,7 @@ class Collection extends BaseCollection
     protected $schema = [];
 
     /**
-     * @var null|Closure
+     * @var null|\Closure
      */
     protected $casts;
 
@@ -95,9 +94,9 @@ class Collection extends BaseCollection
 
     public function first(callable $callback = null, $default = null)
     {
-        return (new Item(Arr::first($this->items, $callback, $default)))
-            ->schematize($this->casts)
-        ;
+        return (
+            new Item(Arr::first($this->items, $callback, $default))
+        )->schematize($this->casts);
     }
 
     public function each(callable $callback): self

@@ -19,13 +19,13 @@
     "prefer-stable": true,
     "minimum-stability": "dev",
     "require": {
-        "php": "^8.0",
+        "php": "^7.4||^8.0||^8.1",
         "symfony/polyfill-php81": "^1.26",
         "symfony/polyfill-php80": "^1.26",
-        "illuminate/database": "^9.35",
-        "illuminate/http": "^9.35",
-        "illuminate/pagination": "^9.35",
-        "illuminate/validation": "^9.35"
+        "illuminate/database": "^8.83||^9.35||^10.11",
+        "illuminate/http": "^8.83||^9.35||^10.11",
+        "illuminate/pagination": "^8.83||^9.35||^10.11",
+        "illuminate/validation": "^8.83||^9.35||^10.11"
     },
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.7",
