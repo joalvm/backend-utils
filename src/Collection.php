@@ -65,7 +65,7 @@ class Collection extends BaseCollection
             return $items->all();
         }
 
-        if ($items instanceof \ArrayAccess) {
+        if ($items instanceof \ArrayAccess or is_array($items)) {
             return $items;
         }
 

@@ -18,10 +18,22 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
     /**
      * Crea una nueva instancia Item.
      *
-     * @param array|\stdClass $attributes
+     * @param array|\ArrayAccess|\stdClass $attributes
      */
     public function __construct($attributes = [])
     {
+        if (
+            !is_array($attributes)
+            and !($attributes instanceof \ArrayAccess)
+            and !($attributes instanceof \stdClass)
+        ) {
+            $attributes = [];
+        }
+
+        if ($attributes instanceof \stdClass or $attributes instanceof \ArrayAccess) {
+            $attributes = (array) $attributes;
+        }
+
         $this->attributes = $attributes;
     }
 
@@ -31,62 +43,27 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
     }
 
     /**
-     * Manejar llamadas dinámicas a la instancia Item para establecer atributos.
+     * Verifica dinámicamente si un atributo existe.
      *
-     * @param string $method
-     * @param array  $parameters
-     *
-     * @return $this
-     */
-    public function __call($method, $parameters)
-    {
-        $this->attributes[$method] = count($parameters) > 0 ? $parameters[0] : true;
-
-        return $this;
-    }
-
-    /**
-     * Recuperar dinámicamente el valor de un atributo.
-     *
-     * @param string $key
-     *
-     * @return mixed
-     */
-    public function __get($key)
-    {
-        return $this->get($key);
-    }
-
-    /**
-     * Establecer dinámicamente el valor de un atributo.
-     *
-     * @param mixed $value
-     */
-    public function __set(string $key, $value): void
-    {
-        $this->set($key, $value);
-    }
-
-    /**
-     * Verifique dinámicamente si un atributo está establecido.
-     *
-     * @param string $key
+     * @param string $name
      *
      * @return bool
      */
-    public function __isset($key)
+    public function __isset($name)
     {
-        return $this->offsetExists($key);
+        return $this->offsetExists($name);
     }
 
     /**
      * Remueve dinámicamente un atributo.
      *
-     * @param string $key
+     * @param string $name
      */
-    public function __unset($key)
+    public function __unset($name)
     {
-        $this->offsetUnset($key);
+        $this->offsetUnset($name);
+
+        return true;
     }
 
     public function count(): int
@@ -140,7 +117,7 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
      *
      * @param string[] $keys
      */
-    public function ints(array $keys): void
+    public function castIntValues(array $keys): void
     {
         foreach ($keys as $key) {
             if (!$this->has($key)) {
@@ -152,19 +129,38 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
     }
 
     /**
+     * Alias de castIntValues.
+     */
+    public function intValues(array $keys): void
+    {
+        $this->castIntValues($keys);
+    }
+
+    /**
      * Castea todos las keys a valores flotantes.
      *
-     * @param string[] $keys
+     * @param string[] $keys lista de keys a castear a float
      */
-    public function floats(array $keys): void
-    {
+    public function castFloatValues(
+        array $keys,
+        int $precision = 0,
+        int $mode = PHP_ROUND_HALF_UP
+    ): void {
         foreach ($keys as $key) {
             if (!$this->has($key)) {
                 continue;
             }
 
-            $this->set($key, to_float($this->get($key)));
+            $this->set($key, to_float($this->get($key), $precision, $mode));
         }
+    }
+
+    /**
+     * Alias de castFloatValues.
+     */
+    public function floatValues(array $keys, int $precision = 0, int $mode = PHP_ROUND_HALF_UP): void
+    {
+        $this->castFloatValues($keys, $precision, $mode);
     }
 
     /**
@@ -172,7 +168,7 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
      *
      * @param string[] $keys
      */
-    public function bools(array $keys): void
+    public function castBoolValues(array $keys): void
     {
         foreach ($keys as $key) {
             if (!$this->has($key)) {
@@ -184,11 +180,19 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
     }
 
     /**
+     * Alias de castBoolValues.
+     */
+    public function boolValues(array $keys): void
+    {
+        $this->castBoolValues($keys);
+    }
+
+    /**
      * Castea todos las keys de un json a array asociativos.
      *
      * @param string[] $keys
      */
-    public function jsons(array $keys)
+    public function castJsonValues(array $keys)
     {
         foreach ($keys as $key) {
             if (!$this->has($key)) {
@@ -197,6 +201,14 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
 
             $this->set($key, json_decode($this->get($key), true));
         }
+    }
+
+    /**
+     * Alias de castJsonValues.
+     */
+    public function jsonValues(array $keys): void
+    {
+        $this->castJsonValues($keys);
     }
 
     /**

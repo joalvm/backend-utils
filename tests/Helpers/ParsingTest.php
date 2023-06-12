@@ -102,6 +102,12 @@ class ParsingTest extends TestCase
     {
         $this->assertSame([1.0, 2.0, 3.0], to_list_float('1.0,2.0,3.0,a'));
         $this->assertSame([1.0, 2.0, 3.0], to_list_float([1.0, 2.0, 3.0, 'a']));
+        // With Precision 2
+        $this->assertSame([1.11, 2.22, 3.33], to_list_float('1.111,2.222,3.333,a', false, 2));
+        // With Precision 2 and Mode Round Half Up
+        $this->assertSame([1.12, 2.22, 3.33], to_list_float('1.115,2.222,3.333,a', false, 2, PHP_ROUND_HALF_UP));
+        // With Precision 2 and Mode Round Half Down
+        $this->assertSame([1.11, 2.22, 3.33], to_list_float('1.115,2.222,3.333,a', false, 2, PHP_ROUND_HALF_DOWN));
     }
 
     public function testToListFloatWithEmptyValues(): void
@@ -114,6 +120,12 @@ class ParsingTest extends TestCase
     {
         $this->assertSame([1, 2, 3, 4.0], to_list_numeric('1,2,3,4.0,a'));
         $this->assertSame([1, 2, 3, 4.0], to_list_numeric([1, 2, 3, '4.0', 'a']));
+        // With Precision 2
+        $this->assertSame([1.11, 2.22, 3.33, 4.44], to_list_numeric('1.111,2.222,3.333,4.444,a', false, 2));
+        // With Precision 2 and Mode Round Half Up
+        $this->assertSame([1.12, 2.22, 3.33, 4.44], to_list_numeric('1.115,2.222,3.333,4.444,a', false, 2, PHP_ROUND_HALF_UP));
+        // With Precision 2 and Mode Round Half Down
+        $this->assertSame([1.11, 2.22, 3.33, 4.44], to_list_numeric('1.115,2.222,3.333,4.444,a', false, 2, PHP_ROUND_HALF_DOWN));
     }
 
     public function testToListNumericWithEmptyValues(): void

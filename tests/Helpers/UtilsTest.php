@@ -37,59 +37,16 @@ class UtilsTest extends TestCase
         $this->assertEquals('1 TB', format_bytes(1024 * 1024 * 1024 * 1024));
     }
 
+    public function testSanitizeStr(): void
+    {
+        $this->assertEquals('string', sanitize_str('string'));
+        $this->assertEquals('string&#34;', sanitize_str('string"'));
+        $this->assertEquals('string&#39;', sanitize_str('string\''));
+        $this->assertEquals('string', sanitize_str('string<'));
+    }
+
     public function testDot(): void
     {
         $this->assertEquals(['a.b.c' => 'd'], dot(['a' => ['b' => ['c' => 'd']]]));
     }
 }
-
-// use Joalvm\Utils\Cast;
-// use PHPUnit\Framework\TestCase;
-// use stdClass;
-
-// /**
-//  * @internal
-//  * @coversNothing
-//  */
-// class CastTest extends TestCase
-// {
-//     public function testRemueveEspaciosVacios(): void
-//     {
-//         $this->assertSame('string', Cast::toStr('  string  '));
-//     }
-
-//     public function testRetornaNullCuandoEsUnStringVacio(): void
-//     {
-//         $this->assertNull(Cast::toStr(''));
-//     }
-
-//     public function testRetornaNullCuandoElValorNoEsStringable(): void
-//     {
-//         $this->assertNull(Cast::toStr(new stdClass()));
-//     }
-
-//     public function testConvierteUnStringAEntero(): void
-//     {
-//         $this->assertIsInt(Cast::toInt('23'));
-//     }
-
-//     public function testConvierteCualquierValorNumericoAEntero(): void
-//     {
-//         $this->assertIsInt(Cast::toInt('23.5'));
-//     }
-
-//     public function testConvierteUnValorFlotanteAEntero(): void
-//     {
-//         $this->assertIsInt(Cast::toInt(23.5));
-//     }
-
-//     public function testRetornaNullCuandoNoEsUnValorNumerico(): void
-//     {
-//         $this->assertNull(Cast::toInt('NoNumericValue_23'));
-//     }
-
-//     public function testRetornaNullCuandoExistenEspacios(): void
-//     {
-//         $this->assertNull(Cast::toInt(' 23 '));
-//     }
-// }

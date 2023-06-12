@@ -37,15 +37,17 @@ if (!function_exists('to_float')) {
      * Castea un valor a flotante.
      *
      * @param mixed $value
+     * @param int   $precision precision de decimales, si es negativo no se redondea
+     * @param int   $mode      modo de redondeo, por defecto PHP_ROUND_HALF_UP
      */
-    function to_float($value, int $precision = 0, int $mode = PHP_ROUND_HALF_UP): ?float
+    function to_float($value, int $precision = -1, int $mode = PHP_ROUND_HALF_UP): ?float
     {
         if (is_float($value)) {
-            return 0 === $precision ? $value : round($value, $precision, $mode);
+            return $precision < 0 ? $value : round($value, $precision, $mode);
         }
 
         if (is_numeric($value = is_string($value) ? to_str($value) : $value)) {
-            return 0 === $precision
+            return $precision < 0
                 ? floatval($value)
                 : round(floatval($value), $precision, $mode);
         }
@@ -62,7 +64,7 @@ if (!function_exists('to_numeric')) {
      *
      * @return null|float|int
      */
-    function to_numeric($value, int $precision = 0, int $mode = PHP_ROUND_HALF_UP)
+    function to_numeric($value, int $precision = -1, int $mode = PHP_ROUND_HALF_UP)
     {
         if (is_numeric($value)) {
             return is_float($value + 0)
@@ -165,7 +167,7 @@ if (!function_exists('to_list_float')) {
     function to_list_float(
         $values,
         bool $keepNulls = false,
-        int $precision = 0,
+        int $precision = -1,
         int $mode = PHP_ROUND_HALF_UP,
         string $separator = ','
     ): array {
@@ -196,7 +198,7 @@ if (!function_exists('to_list_numeric')) {
     function to_list_numeric(
         $values,
         bool $keepNulls = false,
-        int $precision = 0,
+        int $precision = -1,
         int $mode = PHP_ROUND_HALF_UP,
         string $separator = ','
     ): array {

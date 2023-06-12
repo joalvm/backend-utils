@@ -6,9 +6,10 @@ if (!function_exists('cast_assoc_int')) {
     /**
      * Castea a enteros los valores de un array asociativo.
      *
-     * @param string[] $keys
+     * @param array|ArrayAccess $item
+     * @param string[]          $keys
      */
-    function cast_assoc_int(ArrayAccess &$item, array $keys = [])
+    function cast_assoc_int(&$item, array $keys = [])
     {
         foreach ($keys as $key) {
             if (Arr::has($item, $key)) {
@@ -22,12 +23,13 @@ if (!function_exists('cast_assoc_float')) {
     /**
      * Castea a float los valores de un array asociativo.
      *
-     * @param string[] $keys
+     * @param array|ArrayAccess $item
+     * @param string[]          $keys
      */
     function cast_assoc_float(
-        ArrayAccess &$item,
+        &$item,
         array $keys = [],
-        int $precision = 0,
+        int $precision = -1,
         int $mode = PHP_ROUND_HALF_UP
     ) {
         foreach ($keys as $key) {
@@ -46,12 +48,13 @@ if (!function_exists('cast_assoc_numeric')) {
     /**
      * Castea a numerico los valores de un array asociativo.
      *
-     * @param string[] $keys
+     * @param array|ArrayAccess $item
+     * @param string[]          $keys
      */
     function cast_assoc_numeric(
-        ArrayAccess &$item,
+        &$item,
         array $keys = [],
-        int $precision = 0,
+        int $precision = -1,
         int $mode = PHP_ROUND_HALF_UP
     ) {
         foreach ($keys as $key) {
@@ -70,9 +73,10 @@ if (!function_exists('cast_assoc_bool')) {
     /**
      * Castea a boleano los valores de un array asociativo.
      *
-     * @param string[] $keys
+     * @param array|ArrayAccess $item
+     * @param string[]          $keys
      */
-    function cast_assoc_bool(ArrayAccess &$item, array $keys = [])
+    function cast_assoc_bool(&$item, array $keys = [])
     {
         foreach ($keys as $key) {
             if (Arr::has($item, $key)) {
@@ -86,9 +90,10 @@ if (!function_exists('cast_assoc_json')) {
     /**
      * Castea un json a array asociativo, los valores de un array asociativo.
      *
-     * @param string[] $keys
+     * @param array|ArrayAccess $item
+     * @param string[]          $keys
      */
-    function cast_assoc_json(ArrayAccess &$item, array $keys = [])
+    function cast_assoc_json(&$item, array $keys = [])
     {
         foreach ($keys as $key) {
             if (Arr::has($item, $key)) {

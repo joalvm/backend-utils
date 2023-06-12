@@ -3,9 +3,9 @@
 namespace Joalvm\Utils;
 
 use Illuminate\Http\Response as BaseResponse;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Joalvm\Utils\Exceptions\UnprocessableEntityException;
-use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 class Response extends BaseResponse
 {
@@ -73,10 +73,8 @@ class Response extends BaseResponse
 
     /**
      * Captura las excepciones.
-     *
-     * @param Exception|ValidationException $ex
      */
-    public static function catch($ex): self
+    public static function catch(\Throwable $ex): self
     {
         $httpCode = $ex->getCode();
         $message = $ex->getMessage();
@@ -84,16 +82,32 @@ class Response extends BaseResponse
 
         // Las excepciones de laravel guardan los codigo en
         // en el metodo getStatusCode
-        if (method_exists($ex, 'getStatusCode')) {
-            $httpCode = call_user_func([$ex, 'getStatusCode']);
+        // Las excepciones de laravel guardan los codigo en en el metodo getStatusCode
+        if ($ex instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+            $httpCode = $ex->getStatusCode();
         }
 
-        if (self::isValidatorException($ex)) {
-            $httpCode = self::HTTP_UNPROCESSABLE_ENTITY;
+        // Cuando se usa el metodos findOrFail de eloquent
+        if ($ex instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+            $httpCode = self::HTTP_NOT_FOUND;
+            $message = sprintf(
+                'Resource %s not found',
+                Str::snake(Str::singular(Str::afterLast($ex->getModel(), '\\')), ' ')
+            );
+            $content = $ex->getIds();
+        }
+
+        if ($ex instanceof \Joalvm\Utils\Exceptions\HttpException) {
             $content = $ex->errors();
-            $message = $ex->getMessage(); // Respuesta custom
-        } elseif (method_exists($ex, 'status')) {
-            $httpCode = call_user_func([$ex, 'status']);
+        }
+
+        if (
+            $ex instanceof ValidationException
+            or $ex instanceof UnprocessableEntityException
+        ) {
+            $httpCode = self::HTTP_UNPROCESSABLE_ENTITY;
+            $message = $ex->getMessage();
+            $content = $ex->errors();
         }
 
         return new static($content, $httpCode, $message);
@@ -142,13 +156,5 @@ class Response extends BaseResponse
         }
 
         return empty($content);
-    }
-
-    private static function isValidatorException(\Throwable $ex): bool
-    {
-        return
-            $ex instanceof ValidationException
-            or $ex instanceof UnprocessableEntityException
-            or $ex instanceof UnprocessableEntityHttpException;
     }
 }
