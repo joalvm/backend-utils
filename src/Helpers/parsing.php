@@ -2,9 +2,11 @@
 
 if (!function_exists('to_str')) {
     /**
-     * Castea un valor a string.
+     * Converts a value to a string.
      *
-     * @param mixed $value
+     * @param mixed $value the value to be converted to a string
+     *
+     * @return null|string the converted string value, or null if the resulting string has a length of zero
      */
     function to_str($value): ?string
     {
@@ -14,9 +16,11 @@ if (!function_exists('to_str')) {
 
 if (!function_exists('to_int')) {
     /**
-     * Castea un valor a entero.
+     * Converts a value to an integer.
      *
-     * @param mixed $value
+     * @param mixed $value the value to be converted to an integer
+     *
+     * @return null|int the converted integer value or null if the value cannot be converted
      */
     function to_int($value): ?int
     {
@@ -24,8 +28,10 @@ if (!function_exists('to_int')) {
             return $value;
         }
 
-        if (is_numeric($value = is_string($value) ? to_str($value) : $value)) {
-            return intval($value);
+        $stringValue = to_str($value);
+
+        if (is_numeric($stringValue)) {
+            return (int) $stringValue;
         }
 
         return null;
@@ -33,12 +39,15 @@ if (!function_exists('to_int')) {
 }
 
 if (!function_exists('to_float')) {
+    // @phpcs:disable Generic.Files.LineLength.TooLong
     /**
-     * Castea un valor a flotante.
+     * Converts a value to a float.
      *
-     * @param mixed $value
-     * @param int   $precision precision de decimales, si es negativo no se redondea
-     * @param int   $mode      modo de redondeo, por defecto PHP_ROUND_HALF_UP
+     * @param mixed $value     the value to be converted to a float
+     * @param int   $precision The number of decimal places to round the float to. If negative, no rounding is performed. Default is -1.
+     * @param int   $mode      The rounding mode to use. Default is `PHP_ROUND_HALF_UP`.
+     *
+     * @return null|float the input value converted to a float, rounded if necessary, or null if the input value is not numeric
      */
     function to_float($value, int $precision = -1, int $mode = PHP_ROUND_HALF_UP): ?float
     {
@@ -46,10 +55,10 @@ if (!function_exists('to_float')) {
             return $precision < 0 ? $value : round($value, $precision, $mode);
         }
 
-        if (is_numeric($value = is_string($value) ? to_str($value) : $value)) {
-            return $precision < 0
-                ? floatval($value)
-                : round(floatval($value), $precision, $mode);
+        if (is_numeric($value = to_str($value))) {
+            $value = floatval($value);
+
+            return $precision < 0 ? $value : round($value, $precision, $mode);
         }
 
         return null;
@@ -60,9 +69,11 @@ if (!function_exists('to_numeric')) {
     /**
      * Castea un valor a entero o flotante.
      *
-     * @param mixed $value
+     * @param mixed $value     el valor a convertir a un tipo numérico
+     * @param int   $precision (opcional) El número de decimales a redondear el valor flotante. Por defecto es -1.
+     * @param int   $mode      (opcional) El modo de redondeo a utilizar al redondear el valor flotante. Por defecto es `PHP_ROUND_HALF_UP`.
      *
-     * @return null|float|int
+     * @return null|float|int Devuelve null si el valor no es numérico. Devuelve el valor flotante convertido si el valor es un flotante. Devuelve el valor entero convertido si el valor no es un flotante.
      */
     function to_numeric($value, int $precision = -1, int $mode = PHP_ROUND_HALF_UP)
     {
@@ -80,15 +91,17 @@ if (!function_exists('to_bool')) {
     /**
      * Castea un valor a booleano.
      *
-     * @param mixed $value
+     * @param mixed $value the value to be converted to a boolean
+     *
+     * @return null|bool Returns a boolean value if the input can be converted to true or false. Returns null if the input cannot be converted to a boolean.
      */
     function to_bool($value): ?bool
     {
         if (is_bool($value)) {
-            return boolval($value);
+            return $value;
         }
 
-        if (is_string($value) or is_int($value)) {
+        if (is_scalar($value)) {
             if (preg_match('/^(true|1|yes|on|y|t)$/i', to_str($value))) {
                 return true;
             }
@@ -96,6 +109,7 @@ if (!function_exists('to_bool')) {
             if (preg_match('/^(false|0|no|n|off|f)$/i', to_str($value))) {
                 return false;
             }
+            dd('is_scalar', to_str($value));
         }
 
         return null;
@@ -222,7 +236,9 @@ if (!function_exists('to_list_numeric')) {
 
 if (!function_exists('to_list_bool')) {
     /**
-     * Castea un valor a una lista de booleano, si es un string se separa por comas.
+     * Returns an array of booleans from a string or array of values.
+     * If $keepNulls is true, it will include any null values as well.
+     * $separator is the delimiter used to separate values in the string.
      *
      * @param mixed $values
      */
@@ -237,9 +253,11 @@ if (!function_exists('to_list_bool')) {
                 continue;
             }
 
-            if (is_bool($value = to_bool($value))) {
-                $array[] = $value;
+            if (!is_bool($value = to_bool($value))) {
+                continue;
             }
+
+            $array[] = $value;
         }
 
         return $array;

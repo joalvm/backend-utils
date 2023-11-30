@@ -14,9 +14,19 @@ use Joalvm\Utils\Request\Sort;
 
 class Builder extends BaseBuilder
 {
-    protected $timestamps = [];
-
+    /**
+     * Alias de la tabla principal.
+     *
+     * @var string
+     */
     protected $fromAs = '';
+
+    /**
+     * Id de la tabla principal.
+     *
+     * @var string
+     */
+    protected $primaryKey = '';
 
     /**
      * Schema de la consulta.
@@ -45,7 +55,7 @@ class Builder extends BaseBuilder
     /**
      * @var \callable
      */
-    private $castCallback;
+    private $casts;
 
     public function __construct(?ConnectionInterface $connection = null)
     {
@@ -65,6 +75,13 @@ class Builder extends BaseBuilder
     public static function table(string $table, string $as = null): self
     {
         return (new static())->from($table, $as);
+    }
+
+    public function primaryKey(string $primaryKey): self
+    {
+        $this->primaryKey = to_str($primaryKey);
+
+        return $this;
     }
 
     public function from($tableName, $as = null)
@@ -97,6 +114,7 @@ class Builder extends BaseBuilder
     public function schema($columns = ['*'])
     {
         $this->schema->setItems($columns);
+
         $this->registerColumns();
 
         return $this;
@@ -130,16 +148,20 @@ class Builder extends BaseBuilder
 
         return (
             new Collection($this->get(), $this->schema->keys())
-        )->setCasts($this->castCallback);
+        )->setCasts($this->casts);
     }
 
-    public function getOne(): Item
+    public function getOne(int|null $id = null): Item
     {
-        $this->paginateBag->disable();
+        $this->paginateBag->setPaginate(false);
 
         $this->limit(1);
 
-        return (new Item((array) $this->first()))->schematize($this->castCallback);
+        if ($this->primaryKey and !is_null($id)) {
+            $this->where($this->primaryKey, to_int($id));
+        }
+
+        return Item::make((array) $this->first())->schematize($this->casts);
     }
 
     /**
@@ -162,17 +184,17 @@ class Builder extends BaseBuilder
                 ),
                 $this->schema->keys()
             )
-        )->setCasts($this->castCallback);
+        )->setCasts($this->casts);
     }
 
     /**
      * Funcion que castea cada item.
      *
-     * @param callable(Item): void $callback
+     * @param \Closure(Item): void $closure
      */
-    public function casts(callable $callback): self
+    public function casts(\Closure $closure): self
     {
-        $this->castCallback = $callback;
+        $this->casts = $closure;
 
         return $this;
     }
@@ -189,39 +211,45 @@ class Builder extends BaseBuilder
                 continue;
             }
 
-            if (is_array($item)) {
-                if ($this->isQueryable($item[0])) {
-                    $this->selectSub($item[0], DB::raw(sprintf('"%s"', $item[1])));
+            if (!is_array($item)) {
+                continue;
+            }
 
-                    continue;
-                }
+            if ($this->isQueryable($item[0])) {
+                $this->selectSub($item[0], DB::raw(sprintf('"%s"', $item[1])));
 
-                if ($item[0] instanceof Expression) {
-                    $column = method_exists($item[0], '__toString')
-                        ? (string) $item[0]
-                        : $item[0]->getValue($this->grammar);
+                continue;
+            }
 
-                    $this->addSelect(
-                        DB::raw(sprintf('(%s) as "%s"', $column, $item[1]))
-                    );
+            if ($item[0] instanceof Expression) {
+                $column = method_exists($item[0], '__toString')
+                    ? (string) $item[0]
+                    : $item[0]->getValue($this->grammar);
 
-                    continue;
-                }
+                $this->addSelect(
+                    DB::raw(sprintf('(%s) as "%s"', $column, $item[1]))
+                );
+
+                continue;
             }
         }
     }
 
     private function resolveTableAs(string $tableName): array
     {
-        $tableName = str_replace(' as ', ' AS ', $tableName);
+        // @codingStandardsIgnoreLine
+        $regex = '/^(?:(?:"|\'|`|\[)?(?P<schema>[a-zA-Z0-9_]+)(?:"|\'|`|\])?\.)?(?:(?:"|\'|`|\[)?(?P<table>[a-zA-Z0-9_]+)(?:"|\'|`|\])?)(?:\s+)?(?:as\s+)?(?:(?:"|\'|`|\[)?(?P<alias>[a-zA-Z0-9_]+)(?:"|\'|`|\])?)?$/i';
 
-        return (2 == count($parts = explode(' AS ', $tableName)))
-            ? $parts
-            : (
-                2 == count($parts = explode(' ', $tableName))
-                    ? $parts
-                    : [$tableName, $tableName]
+        if (false === preg_match($regex, $tableName, $matches, PREG_UNMATCHED_AS_NULL)) {
+            throw new \InvalidArgumentException(
+                sprintf('Invalid statement for table: %s', $tableName)
             );
+        }
+
+        $schema = $matches['schema'] ? trim($matches['schema']) . '.' : '';
+        $alias = $matches['alias'] ?? $matches['table'];
+
+        return [$schema . trim($matches['table']), trim($alias)];
     }
 
     private function prepareSearch(): void

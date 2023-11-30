@@ -24,22 +24,15 @@ class Paginate
     {
         $bag = new ParameterBag($parameters);
 
-        $this->paginate = $bag->getBoolean(self::PARAMETER_PAGINATE, true);
+        $this->setPaginate($bag->getBoolean(self::PARAMETER_PAGINATE, true));
 
         $this->handlePerPage($bag);
         $this->handlePage($bag);
     }
 
-    public function disable(): self
+    public function setPaginate(bool $value = true): self
     {
-        $this->paginate = false;
-
-        return $this;
-    }
-
-    public function enable(): self
-    {
-        $this->paginate = true;
+        $this->paginate = $value;
 
         return $this;
     }

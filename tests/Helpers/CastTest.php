@@ -84,4 +84,26 @@ class CastTest extends TestCase
 
         $this->assertSame(['a' => 1.1, 'b' => 2.2, 'c' => '3.3'], $item);
     }
+
+    public function testToBoolPerformance()
+    {
+        // Número de iteraciones para medir el rendimiento
+        $iterations = 100000;
+
+        // Establece un límite de tiempo razonable en segundos
+        $maxExecutionTime = 1; // Por ejemplo, 1 segundo
+
+        $start = microtime(true);
+
+        for ($i = 0; $i < $iterations; ++$i) {
+            // Llama a la función to_bool con un valor de prueba
+            to_bool('true');
+        }
+
+        $end = microtime(true);
+        $executionTime = $end - $start;
+
+        // Comprueba si el tiempo de ejecución está dentro del límite
+        $this->assertLessThan($maxExecutionTime, $executionTime);
+    }
 }

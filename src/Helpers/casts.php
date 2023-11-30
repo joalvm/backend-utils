@@ -97,7 +97,14 @@ if (!function_exists('cast_assoc_json')) {
     {
         foreach ($keys as $key) {
             if (Arr::has($item, $key)) {
-                Arr::set($item, $key, json_decode(Arr::get($item, $key), true));
+                $value = Arr::get($item, $key, true);
+                Arr::set(
+                    $item,
+                    $key,
+                    '{}' === $value
+                        ? new \stdClass()
+                        : json_decode($value, true)
+                );
             }
         }
     }

@@ -95,6 +95,8 @@ class Response extends BaseResponse
                 Str::snake(Str::singular(Str::afterLast($ex->getModel(), '\\')), ' ')
             );
             $content = $ex->getIds();
+
+            return new static($content, $httpCode, $message);
         }
 
         if ($ex instanceof \Joalvm\Utils\Exceptions\HttpException) {

@@ -342,6 +342,11 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
         Arr::forget($this->attributes, $offset);
     }
 
+    public static function make(array $attributes = []): self
+    {
+        return new static($attributes);
+    }
+
     /**
      * Analiza todos los objetos asociativos en busca de nulls
      * en caso de hallar todos los valores null, convierte el array en null.
