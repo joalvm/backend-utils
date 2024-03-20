@@ -52,5 +52,12 @@
         "psr-4": {
             "Joalvm\\Tests\\": "tests/"
         }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Joalvm\\Utils\\UtilsServiceProvider"
+            ]
+        }
     }
 }

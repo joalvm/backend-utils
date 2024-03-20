@@ -3,57 +3,105 @@
 namespace Joalvm\Utils;
 
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Collection as BaseCollection;
 
+/**
+ * @template TKey of array-key
+ * @template TValue of \Invian\Components\Item
+ *
+ * @implements \ArrayAccess<TKey, TValue>
+ * @implements \Illuminate\Support\Enumerable<TKey, TValue>
+ */
 class Collection extends BaseCollection
 {
     /**
-     * Contiene la estructura para cada item de la colección.
-     *
-     * @var array
-     */
-    protected $schema = [];
-
-    /**
-     * @var null|\Closure
-     */
-    protected $casts;
-
-    /**
      * Indica si la colección está paginada.
-     *
-     * @var bool
      */
-    private $isPaginate = false;
+    protected bool $paginate = false;
 
     /**
      * Contiene la metadata de la colección cuando está paginada.
-     *
-     * @var array
      */
-    private $metadata;
+    private array $metadata = [
+        'per_page' => 0,
+        'current_page' => null,
+        'from' => null,
+        'last_page' => null,
+        'per_page' => null,
+        'to' => null,
+        'total' => 0,
+    ];
 
     /**
      * @param BaseCollection|LengthAwarePaginator $items
      */
-    public function __construct($items, array $schema = [])
+    public function __construct($items = [])
     {
-        parent::__construct($this->normalizeData($items));
-
-        $this->schema = $schema;
+        parent::__construct($this->handleItems($items));
     }
 
-    public function normalizeData($items): array
+    public function schematize(?callable $fnCasts = null): self
+    {
+        $original = $this->items;
+
+        $this->items = [];
+
+        foreach ($original as &$item) {
+            $this->items[] = Item::make($item)->schematize($fnCasts);
+        }
+
+        return $this;
+    }
+
+    public function getMetadata(): ?array
+    {
+        return $this->metadata;
+    }
+
+    public function perPage(): ?int
+    {
+        return $this->metadata['per_page'] ?? null;
+    }
+
+    public function currentPage(): ?int
+    {
+        return $this->metadata['current_page'] ?? null;
+    }
+
+    public function from(): ?int
+    {
+        return $this->metadata['from'] ?? null;
+    }
+
+    public function lastPage(): ?int
+    {
+        return $this->metadata['last_page'] ?? null;
+    }
+
+    public function to(): ?int
+    {
+        return $this->metadata['to'] ?? null;
+    }
+
+    public function total(): int
+    {
+        return $this->metadata['total'] ?? count($this->items) ?? 0;
+    }
+
+    public function isPaginate(): bool
+    {
+        return true === $this->paginate;
+    }
+
+    protected function handleItems($items): array
     {
         if ($items instanceof LengthAwarePaginator) {
-            $this->isPaginate = true;
+            $this->paginate = true;
             $this->metadata = [
                 'per_page' => $items->perPage(),
                 'current_page' => $items->currentPage(),
                 'from' => $items->firstItem(),
                 'last_page' => $items->lastPage(),
-                'per_page' => $items->perPage(),
                 'to' => $items->lastItem(),
                 'total' => $items->total(),
             ];
@@ -70,69 +118,5 @@ class Collection extends BaseCollection
         }
 
         return [];
-    }
-
-    public function all()
-    {
-        return $this->getAll(parent::all());
-    }
-
-    public function getMetadata(): ?array
-    {
-        return $this->metadata;
-    }
-
-    /**
-     * Get the collection of items as a plain array.
-     *
-     * @return array
-     */
-    public function toArray()
-    {
-        return $this->all();
-    }
-
-    public function first(callable $callback = null, $default = null)
-    {
-        return (
-            new Item(Arr::first($this->items, $callback, $default))
-        )->schematize($this->casts);
-    }
-
-    public function each(callable $callback): self
-    {
-        foreach ($this->items as $key => &$item) {
-            $callback($item, $key);
-        }
-
-        return $this;
-    }
-
-    /**
-     * Set the value of casts.
-     *
-     * @return self
-     */
-    public function setCasts(?callable $casts)
-    {
-        $this->casts = $casts;
-
-        return $this;
-    }
-
-    public function isPagination(): bool
-    {
-        return $this->isPaginate;
-    }
-
-    private function getAll(array $items): array
-    {
-        foreach ($items as &$item) {
-            $item = new Item($item);
-
-            $item->schematize($this->casts);
-        }
-
-        return $items;
     }
 }

@@ -7,54 +7,44 @@ use Illuminate\Database\Query\Builder as BaseBuilder;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Request;
-use Joalvm\Utils\Request\Paginate;
-use Joalvm\Utils\Request\Schema;
-use Joalvm\Utils\Request\Search;
-use Joalvm\Utils\Request\Sort;
+use Joalvm\Utils\Request\Parameters\Paginate;
+use Joalvm\Utils\Request\Parameters\Schema;
+use Joalvm\Utils\Request\Parameters\Search;
+use Joalvm\Utils\Request\Parameters\Sort;
+use Joalvm\Utils\Traits\QueryParams;
 
 class Builder extends BaseBuilder
 {
-    protected $timestamps = [];
-
-    protected $fromAs = '';
+    use QueryParams;
 
     /**
      * Schema de la consulta.
-     *
-     * @var Schema
      */
-    protected $schema;
+    protected ?Schema $schema;
 
     /**
-     * Paginación de la colección.
-     *
-     * @var Paginate
+     * Nombre de la llave primaria.
      */
-    private $paginateBag;
+    protected string $primaryKey = 'id';
 
     /**
-     * @var Search
+     * Función de casteo de la llave primaria.
      */
-    private $searchBag;
+    protected string $primaryKeyfnCast = 'to_int';
 
     /**
-     * @var Sort
+     * @var \Closure
      */
-    private $sortBag;
-
-    /**
-     * @var \callable
-     */
-    private $castCallback;
+    private $fnCasts;
 
     public function __construct(?ConnectionInterface $connection = null)
     {
         parent::__construct($connection ?? DB::connection());
 
-        $this->schema = new Schema($this->grammar);
-        $this->paginateBag = new Paginate(Request::query());
-        $this->searchBag = new Search();
-        $this->sortBag = new Sort();
+        $this->schema = new Schema(Request::query(), $this->grammar);
+        $this->paginate = new Paginate(Request::query());
+        $this->search = new Search(Request::query());
+        $this->sort = new Sort(Request::query());
     }
 
     public static function connection(string $name = null): self
@@ -117,71 +107,109 @@ class Builder extends BaseBuilder
     }
 
     /**
-     * Obtiene elementos en base al proceso de esquematización.
-     */
-    public function all(): Collection
-    {
-        if ($this->paginateBag->paginate) {
-            return $this->pagination();
-        }
-
-        $this->prepareSearch();
-        $this->prepareSorter();
-
-        return (
-            new Collection($this->get(), $this->schema->keys())
-        )->setCasts($this->castCallback);
-    }
-
-    public function getOne(): Item
-    {
-        $this->paginateBag->disable();
-
-        $this->limit(1);
-
-        return (new Item((array) $this->first()))->schematize($this->castCallback);
-    }
-
-    /**
-     * Fuerza el builder a devolver los datos paginados.
-     */
-    public function pagination(): Collection
-    {
-        $this->paginateBag->paginate = true;
-
-        $this->prepareSearch();
-        $this->prepareSorter();
-
-        return (
-            new Collection(
-                $this->paginate(
-                    $this->paginateBag->perPage,
-                    array_keys($this->columns),
-                    Paginate::PARAMETER_PAGE,
-                    $this->paginateBag->page
-                ),
-                $this->schema->keys()
-            )
-        )->setCasts($this->castCallback);
-    }
-
-    /**
      * Funcion que castea cada item.
      *
      * @param callable(Item): void $callback
      */
     public function casts(callable $callback): self
     {
-        $this->castCallback = $callback;
+        $this->fnCasts = $callback;
 
         return $this;
+    }
+
+    public function all(): Collection
+    {
+        dd('all');
+        $this->prepare();
+
+        dd('post prepare');
+
+        return Collection::make(
+            $this->handleCollection()
+        )->schematize($this->fnCasts);
+    }
+
+    public function find($id, $columns = ['*']): ?Item
+    {
+        $primaryKeyColumn = sprintf(
+            '%s.%s',
+            $this->schema->getFromAs(),
+            $this->primaryKey
+        );
+
+        if (is_callable($this->primaryKeyfnCast)) {
+            $id = call_user_func($this->primaryKeyfnCast, $id);
+        }
+
+        $this->whereId($id, $primaryKeyColumn);
+
+        $item = parent::first($columns);
+
+        if (!$item) {
+            return null;
+        }
+
+        return Item::make($item)->schematize($this->fnCasts);
+    }
+
+    public function first($columns = ['*']): ?Item
+    {
+        $this->prepareSorter();
+
+        $item = parent::first($columns);
+
+        if (!$item) {
+            return null;
+        }
+
+        return Item::make($item)->schematize($this->fnCasts);
+    }
+
+    /**
+     * Añade al inicio de la lista de where la condición de que el id sea igual al valor.
+     *
+     * @return self
+     */
+    protected function whereId(mixed $id, string $primaryKeyColumn)
+    {
+        $this->bindings['where'] = array_merge([$id], $this->bindings['where']);
+        $this->wheres = array_merge(
+            [
+                [
+                    'type' => 'Basic',
+                    'column' => $primaryKeyColumn,
+                    'operator' => '=',
+                    'value' => $id,
+                    'boolean' => 'and',
+                ],
+            ],
+            $this->wheres
+        );
+
+        return $this;
+    }
+
+    private function handleCollection()
+    {
+        if (!$this->paginate->getPaginate()) {
+            return parent::get();
+        }
+
+        return $this->paginate(
+            $this->paginate->getPerPage(),
+            ['*'],
+            Paginate::PARAMETER_PAGE_NAME,
+            $this->paginate->getPage()
+        );
     }
 
     /**
      * Añade a las columnas de la consulta los items del esquema.
      */
-    private function registerColumns()
+    private function registerColumns(): void
     {
+        dd('registerColumns');
         foreach ($this->schema->getValues() as $item) {
             if (is_string($item)) {
                 $this->addSelect(DB::raw($item));
@@ -190,24 +218,36 @@ class Builder extends BaseBuilder
             }
 
             if (is_array($item)) {
-                if ($this->isQueryable($item[0])) {
-                    $this->selectSub($item[0], DB::raw(sprintf('"%s"', $item[1])));
-
-                    continue;
-                }
-
-                if ($item[0] instanceof Expression) {
-                    $column = method_exists($item[0], '__toString')
-                        ? (string) $item[0]
-                        : $item[0]->getValue($this->grammar);
-
-                    $this->addSelect(
-                        DB::raw(sprintf('(%s) as "%s"', $column, $item[1]))
-                    );
-
-                    continue;
-                }
+                $this->registerCustomColum($item);
             }
+        }
+    }
+
+    private function registerCustomColum($item)
+    {
+        if ($this->isQueryable($item[0])) {
+            $this->selectSub(
+                $item[0],
+                $this->grammar->quoteString($item[1])
+            );
+
+            return;
+        }
+
+        if ($item[0] instanceof Expression) {
+            /** @var Expression $column */
+            $column = $item[0];
+            $this->addSelect(
+                DB::raw(
+                    sprintf(
+                        '(%s) as "%s"',
+                        $column->getValue($this->getGrammar()),
+                        $item[1]
+                    )
+                )
+            );
+
+            return;
         }
     }
 
@@ -222,28 +262,5 @@ class Builder extends BaseBuilder
                     ? $parts
                     : [$tableName, $tableName]
             );
-    }
-
-    private function prepareSearch(): void
-    {
-        $this->where(function (self $query) {
-            foreach ($this->searchBag->getValues($this->schema) as $item) {
-                if ($this->isQueryable($item['column'])) {
-                    continue;
-                }
-
-                $query->orWhereRaw(
-                    sprintf('(%s)::text ilike (?)::text', $item['column']),
-                    $item['text']
-                );
-            }
-        });
-    }
-
-    private function prepareSorter(): void
-    {
-        foreach ($this->sortBag->getValues($this->schema) as $item) {
-            $this->orderBy($item['column'], $item['order']);
-        }
     }
 }

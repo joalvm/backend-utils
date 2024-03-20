@@ -43,6 +43,41 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
     }
 
     /**
+     * Manejar llamadas dinámicas a la instancia Item para establecer atributos.
+     *
+     * @param string $method
+     * @param array  $parameters
+     *
+     * @return $this
+     */
+    public function __call($method, $parameters)
+    {
+        $this->attributes[$method] = count($parameters) > 0 ? $parameters[0] : true;
+
+        return $this;
+    }
+
+    /**
+     * Recuperar dinámicamente el valor de un atributo.
+     *
+     * @param string $key
+     */
+    public function __get($key)
+    {
+        return $this->get($key);
+    }
+
+    /**
+     * Establecer dinámicamente el valor de un atributo.
+     *
+     * @param mixed $value
+     */
+    public function __set(string $key, $value): void
+    {
+        $this->set($key, $value);
+    }
+
+    /**
      * Verifica dinámicamente si un atributo existe.
      *
      * @param string $name
@@ -66,15 +101,30 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
         return true;
     }
 
+    public static function make($attributes = []): self
+    {
+        return new static($attributes);
+    }
+
     public function count(): int
     {
         return count(array_keys($this->attributes));
     }
 
     /**
+     * Elimina un atributo de la instancia Item.
+     *
+     * @param array|float|int|string $keys
+     */
+    public function forget(mixed $keys): void
+    {
+        Arr::forget($this->attributes, $keys);
+    }
+
+    /**
      * Estructurar la consulta.
      */
-    public function schematize(callable $callback = null): self
+    public function schematize(callable $fnCasts = null): self
     {
         /** @var array|\stdClass */
         $origin = $this->attributes;
@@ -93,8 +143,10 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
 
         $this->attributes = $this->cleanSchematizedValues($this->attributes);
 
-        if (!is_null($callback)) {
-            call_user_func($callback, $this);
+        if (!is_null($fnCasts)) {
+            // Ejecutar la funcion que castea los valores y pasar la misma clase como referencia.
+            $newthis = &$this;
+            call_user_func($fnCasts, $newthis);
         }
 
         return $this;
@@ -107,7 +159,7 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
     {
         foreach ($keys as $key) {
             if ($this->has($key)) {
-                call_user_func($fn, $this->get($key));
+                $this->set($key, call_user_func($fn, $this->get($key)));
             }
         }
     }
@@ -199,6 +251,14 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
                 continue;
             }
 
+            $value = $this->get($key);
+
+            if ('{}' === $value) {
+                $this->set($key, new \stdClass());
+
+                continue;
+            }
+
             $this->set($key, json_decode($this->get($key), true));
         }
     }
@@ -222,9 +282,7 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
     /**
      * Obtener un atributo de la instancia Item.
      *
-     * @param mixed $default
-     *
-     * @return mixed
+     * @param null|mixed $default
      */
     public function get(string $key, $default = null)
     {
@@ -282,7 +340,7 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
      *
      * @return array
      */
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         return $this->toArray();
     }
@@ -311,12 +369,8 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
 
     /**
      * Obtener el valor de un atributo determinado.
-     *
-     * @param string $offset
-     *
-     * @return mixed
      */
-    public function offsetGet($offset)
+    public function offsetGet(mixed $offset): mixed
     {
         return $this->get($offset);
     }

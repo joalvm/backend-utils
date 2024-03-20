@@ -1,49 +1,55 @@
 <?php
 
-namespace Joalvm\Utils\Request;
+namespace Joalvm\Utils\Request\Parameters;
 
 use Illuminate\Database\Query\Expression;
 use Illuminate\Database\Query\Grammars\Grammar;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Request;
-use Symfony\Component\HttpFoundation\ParameterBag;
 
-class Schema extends ParameterBag
+class Schema
 {
-    public const PARAMETER_SCHEMA = 'schema';
+    public const PARAMETER__NAME = 'schema';
 
     /**
      * Prefijo de la tabla principal que se encuntra definido en el from.
-     *
-     * @var string
      */
-    protected $fromAs = '';
+    protected string $fromAs = '';
+
+    /**
+     * Valores del schema.
+     */
+    protected array $values = [];
 
     /**
      * Items del schema.
+     *
+     * @var string[]
      */
-    protected $items = [];
+    protected array $items = [];
 
     /**
      * Matches del schema.
+     *
+     * @var string[]
      */
-    protected $matches = [];
+    protected array $matches = [];
 
     /**
      * Claves del schema.
+     *
+     * @var string[]
      */
-    protected $keys = [];
+    protected array $keys = [];
 
     /**
-     * @var Grammar
+     * The database query grammar instance.
      */
-    private $grammar;
+    private Grammar $grammar;
 
-    public function __construct(Grammar $grammar)
+    public function __construct(mixed $schema, Grammar $grammar)
     {
-        parent::__construct($this->catchParameters());
-
+        $this->handleSchema($schema);
         $this->generateMatches();
 
         $this->grammar = $grammar;
@@ -56,6 +62,11 @@ class Schema extends ParameterBag
         $this->items = $this->generateSchema($this->items, $alias);
 
         return $this;
+    }
+
+    public function getFromAs(): string
+    {
+        return $this->fromAs;
     }
 
     public function setItems(array $items): self
@@ -185,6 +196,19 @@ class Schema extends ParameterBag
         return $columns;
     }
 
+    private function handleSchema(mixed $schema): void
+    {
+        if (is_string($schema)) {
+            $this->values = to_list($schema);
+
+            return;
+        }
+
+        if (is_array($schema)) {
+            $this->values = array_values($schema);
+        }
+    }
+
     private function generateSchema(array $items, string $alias)
     {
         if (!$items or !$alias) {
@@ -203,27 +227,25 @@ class Schema extends ParameterBag
      */
     private function generateMatches(): void
     {
-        foreach ($this->parameters as $parameter) {
+        foreach ($this->values as $value) {
             $this->matches[] = sprintf(
-                '/^%s/i',
-                str_replace('*', '(?:[a-z._]+)', $parameter)
+                '/^%s(\..+)?$/i',
+                // Se eliminan los puntos al final de la cadena.
+                preg_replace(
+                    '/\.+$/',
+                    '',
+                    // Se eliminan los caracteres especiales excepto el punto y el guion bajo.
+                    preg_replace('/[^a-zA-Z0-9\._]/', '', $value . '.')
+                )
             );
         }
     }
 
-    private function catchParameters(): array
-    {
-        $parameters = Request::query(self::PARAMETER_SCHEMA, []);
-
-        if (is_string($parameters)) {
-            $parameters = to_list($parameters);
-        }
-
-        return array_map('sanitize_str', to_list($parameters));
-    }
-
-    private function schematize(?array $fields = [], ?string $preffix = '', ?string $aliasTable = ''): array
-    {
+    private function schematize(
+        ?array $fields = [],
+        ?string $preffix = '',
+        ?string $aliasTable = ''
+    ): array {
         $nfields = [];
 
         foreach ($fields as $aliasColumn => $field) {
@@ -304,7 +326,7 @@ class Schema extends ParameterBag
                 $value = $this->setPreffix($params['aliasTable'], $field);
             } else {
                 $key = $this->setPreffix($params['preffix'], $params['aliasColumn']);
-                $value = DB::raw("({$field})");
+                $value = DB::raw(sprintf('(%s)', $field));
             }
         }
 
