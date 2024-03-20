@@ -21,8 +21,6 @@ class Search
             $items = [];
         }
 
-        dd($this->values);
-
         $this->values = [
             self::KEY_ITEMS_NAME => $items,
             self::KEY_TEXT_NAME => $text,

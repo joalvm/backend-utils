@@ -209,7 +209,6 @@ class Builder extends BaseBuilder
      */
     private function registerColumns(): void
     {
-        dd('registerColumns');
         foreach ($this->schema->getValues() as $item) {
             if (is_string($item)) {
                 $this->addSelect(DB::raw($item));
