@@ -49,7 +49,7 @@ class Schema
 
     public function __construct(mixed $schema, Grammar $grammar)
     {
-        $this->handleSchema($schema);
+        $this->handleSchema(Arr::get($schema, self::PARAMETER__NAME, []));
         $this->generateMatches();
 
         $this->grammar = $grammar;

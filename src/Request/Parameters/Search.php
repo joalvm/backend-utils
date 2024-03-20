@@ -2,6 +2,8 @@
 
 namespace Joalvm\Utils\Request\Parameters;
 
+use Illuminate\Support\Arr;
+
 class Search
 {
     public const PARAMETER_NAME = 'contains';
@@ -13,7 +15,9 @@ class Search
 
     public function __construct(mixed $contains)
     {
-        list($items, $text) = $this->getQuery($contains);
+        list($items, $text) = $this->getQuery(
+            Arr::get($contains, self::PARAMETER_NAME, [])
+        );
 
         $text = sanitize_str($text ?? '');
 
@@ -31,17 +35,13 @@ class Search
     {
         $values = [];
 
-        dd($this->values);
+        $items = $schema->getColumnsOrValues($this->values[self::KEY_ITEMS_NAME]);
 
-        foreach ($this->values as $value) {
-            $items = $schema->getColumnsOrValues($value[self::KEY_ITEMS_NAME]);
-
-            foreach ($items as $item) {
-                $values[] = [
-                    'column' => $item,
-                    'text' => sprintf('%%s%', $value[self::KEY_TEXT_NAME]),
-                ];
-            }
+        foreach ($items as $item) {
+            $values[] = [
+                'column' => $item,
+                'text' => sprintf('%%%s%%', $this->values[self::KEY_TEXT_NAME]),
+            ];
         }
 
         return $values;

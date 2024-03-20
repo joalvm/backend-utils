@@ -120,10 +120,7 @@ class Builder extends BaseBuilder
 
     public function all(): Collection
     {
-        dd('all');
         $this->prepare();
-
-        dd('post prepare');
 
         return Collection::make(
             $this->handleCollection()
@@ -193,12 +190,12 @@ class Builder extends BaseBuilder
     private function handleCollection()
     {
         if (!$this->paginate->getPaginate()) {
-            return parent::get();
+            return $this->get();
         }
 
         return $this->paginate(
             $this->paginate->getPerPage(),
-            ['*'],
+            $this->schema->getValues(),
             Paginate::PARAMETER_PAGE_NAME,
             $this->paginate->getPage()
         );

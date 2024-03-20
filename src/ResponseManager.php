@@ -293,7 +293,7 @@ class ResponseManager
             $meta = [];
 
             if ($content->isPaginate()) {
-                return ['data' => $content->items(), ...$content->getMeta()];
+                return ['data' => $content->all(), ...$content->getMetadata()];
             }
 
             return $content->all();

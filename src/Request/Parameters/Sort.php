@@ -2,6 +2,8 @@
 
 namespace Joalvm\Utils\Request\Parameters;
 
+use Illuminate\Support\Arr;
+
 class Sort
 {
     public const PARAMETER_NAME = 'sort';
@@ -21,7 +23,9 @@ class Sort
 
     public function __construct(array $sorts)
     {
-        $this->values = $this->normalizeParameter($sorts);
+        $this->values = $this->normalizeParameter(
+            Arr::get($sorts, self::PARAMETER_NAME, [])
+        );
     }
 
     public function getValues(Schema $schema): array

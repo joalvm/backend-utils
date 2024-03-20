@@ -35,7 +35,6 @@ trait QueryParams
     private function prepareSearch(): void
     {
         $this->where(function (self $query) {
-            dd($this->search);
             foreach ($this->search->getValues($this->schema) as $item) {
                 if ($item['column'] instanceof Expression) {
                     $item['column'] = $item['column']->getValue($this->grammar);
