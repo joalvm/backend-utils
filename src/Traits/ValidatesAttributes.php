@@ -4,7 +4,7 @@ namespace Joalvm\Utils\Traits;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Validator;
-use Joalvm\Utils\Exceptions\UnprocessableEntityException;
+use Illuminate\Validation\ValidationException;
 
 trait ValidatesAttributes
 {
@@ -21,7 +21,7 @@ trait ValidatesAttributes
     /**
      * Valida los atributos del modelo según las reglas definidas.
      *
-     * @throws UnprocessableEntityException si la validación falla
+     * @throws ValidationException si la validación falla
      */
     public function validate(): static
     {
@@ -42,19 +42,10 @@ trait ValidatesAttributes
      * @param array $data  los datos a validar
      * @param array $rules las reglas de validación
      *
-     * @throws UnprocessableEntityException si la validación falla
+     * @throws ValidationException si la validación falla
      */
     protected function initValidation(array $data, array $rules): void
     {
-        $validator = Validator::make($data, $rules);
-
-        if ($validator->fails()) {
-            $this->emitValidateException($validator->errors()->toArray());
-        }
-    }
-
-    protected function emitValidateException(array $errors): void
-    {
-        throw new UnprocessableEntityException();
+        Validator::make($data, $rules)->validate();
     }
 }
