@@ -24,13 +24,14 @@
         "cs-fixer": "php-cs-fixer fix . --using-cache=no --config=.php_cs.php"
     },
     "require": {
-        "php": "^7.4||^8.0||^8.1",
+        "php": "^8.0||^8.1",
         "symfony/polyfill-php81": "^1.26",
         "symfony/polyfill-php80": "^1.26",
         "illuminate/database": "^8.83||^9.35||^10.11",
         "illuminate/http": "^8.83||^9.35||^10.11",
         "illuminate/pagination": "^8.83||^9.35||^10.11",
-        "illuminate/validation": "^8.83||^9.35||^10.11"
+        "illuminate/validation": "^8.83||^9.35||^10.11",
+        "firebase/php-jwt": "^6.10"
     },
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.7",
@@ -51,6 +52,13 @@
     "autoload-dev": {
         "psr-4": {
             "Joalvm\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Joalvm\\Utils\\UtilsServiceProvider"
+            ]
         }
     }
 }

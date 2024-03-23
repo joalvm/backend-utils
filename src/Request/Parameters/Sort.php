@@ -1,13 +1,12 @@
 <?php
 
-namespace Joalvm\Utils\Request;
+namespace Joalvm\Utils\Request\Parameters;
 
-use Illuminate\Support\Facades\Request;
-use Symfony\Component\HttpFoundation\ParameterBag;
+use Illuminate\Support\Arr;
 
-class Sort extends ParameterBag
+class Sort
 {
-    public const PARAMETER_SORT = 'sort';
+    public const PARAMETER_NAME = 'sort';
 
     public const ORDER_DESC = 'DESC';
 
@@ -22,22 +21,22 @@ class Sort extends ParameterBag
      */
     protected $values = [];
 
-    public function __construct()
+    public function __construct(array $sorts)
     {
-        parent::__construct(
-            $this->normalizeParameter(Request::query(self::PARAMETER_SORT, []))
+        $this->values = $this->normalizeParameter(
+            Arr::get($sorts, self::PARAMETER_NAME, [])
         );
     }
 
     public function getValues(Schema $schema): array
     {
         $values = [];
-        $items = $schema->getColumnsOrAlias(array_keys($this->parameters));
+        $items = $schema->getColumnsOrAlias(array_keys($this->values));
 
         foreach ($items as $alias => $item) {
             $values[] = [
                 'column' => $item,
-                'order' => $this->parameters[$alias],
+                'order' => $this->values[$alias],
             ];
         }
 

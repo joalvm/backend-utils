@@ -1,19 +1,26 @@
 <?php
 
 use Illuminate\Support\Arr;
+use Joalvm\Utils\Item;
 
 if (!function_exists('cast_assoc_int')) {
     /**
      * Castea a enteros los valores de un array asociativo.
      *
-     * @param array|ArrayAccess $item
-     * @param string[]          $keys
+     * @param array|Item $array
+     * @param string[]   $keys
      */
-    function cast_assoc_int(&$item, array $keys = [])
+    function cast_assoc_int(&$array, array $keys = [])
     {
+        if ($array instanceof Item) {
+            $array->intValues($keys);
+
+            return;
+        }
+
         foreach ($keys as $key) {
-            if (Arr::has($item, $key)) {
-                Arr::set($item, $key, to_int(Arr::get($item, $key)));
+            if (Arr::has($array, $key)) {
+                Arr::set($array, $key, to_int(Arr::get($array, $key)));
             }
         }
     }
@@ -23,64 +30,28 @@ if (!function_exists('cast_assoc_float')) {
     /**
      * Castea a float los valores de un array asociativo.
      *
-     * @param array|ArrayAccess $item
-     * @param string[]          $keys
+     * @param array|Item $array
+     * @param string[]   $keys
      */
     function cast_assoc_float(
-        &$item,
+        &$array,
         array $keys = [],
         int $precision = -1,
         int $mode = PHP_ROUND_HALF_UP
     ) {
+        if ($array instanceof Item) {
+            $array->floatValues($keys, $precision, $mode);
+
+            return;
+        }
+
         foreach ($keys as $key) {
-            if (Arr::has($item, $key)) {
+            if (Arr::has($array, $key)) {
                 Arr::set(
-                    $item,
+                    $array,
                     $key,
-                    to_float(Arr::get($item, $key), $precision, $mode)
+                    to_float(Arr::get($array, $key), $precision, $mode)
                 );
-            }
-        }
-    }
-}
-
-if (!function_exists('cast_assoc_numeric')) {
-    /**
-     * Castea a numerico los valores de un array asociativo.
-     *
-     * @param array|ArrayAccess $item
-     * @param string[]          $keys
-     */
-    function cast_assoc_numeric(
-        &$item,
-        array $keys = [],
-        int $precision = -1,
-        int $mode = PHP_ROUND_HALF_UP
-    ) {
-        foreach ($keys as $key) {
-            if (Arr::has($item, $key)) {
-                Arr::set($item, $key, to_numeric(
-                    Arr::get($item, $key),
-                    $precision,
-                    $mode
-                ));
-            }
-        }
-    }
-}
-
-if (!function_exists('cast_assoc_bool')) {
-    /**
-     * Castea a boleano los valores de un array asociativo.
-     *
-     * @param array|ArrayAccess $item
-     * @param string[]          $keys
-     */
-    function cast_assoc_bool(&$item, array $keys = [])
-    {
-        foreach ($keys as $key) {
-            if (Arr::has($item, $key)) {
-                Arr::set($item, $key, to_bool(Arr::get($item, $key)));
             }
         }
     }
@@ -90,14 +61,24 @@ if (!function_exists('cast_assoc_json')) {
     /**
      * Castea un json a array asociativo, los valores de un array asociativo.
      *
-     * @param array|ArrayAccess $item
-     * @param string[]          $keys
+     * @param array|Item $array
+     * @param string[]   $keys
      */
-    function cast_assoc_json(&$item, array $keys = [])
+    function cast_assoc_json(&$array, array $keys = [], bool $associative = true)
     {
+        if ($array instanceof Item) {
+            $array->jsonValues($keys);
+
+            return;
+        }
         foreach ($keys as $key) {
-            if (Arr::has($item, $key)) {
-                Arr::set($item, $key, json_decode(Arr::get($item, $key), true));
+            if (Arr::has($array, $key)) {
+                $val = Arr::get($array, $key);
+                Arr::set(
+                    $array,
+                    $key,
+                    '{}' === $val ? new stdClass() : json_decode($val, $associative)
+                );
             }
         }
     }
