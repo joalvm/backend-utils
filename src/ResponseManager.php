@@ -3,41 +3,35 @@
 namespace Joalvm\Utils;
 
 use Illuminate\Contracts\Routing\ResponseFactory;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Joalvm\Utils\Exceptions\HttpException;
+use Joalvm\Utils\Exceptions\UnprocessableEntityException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 class ResponseManager
 {
-    public $isDeveloper = false;
-
-    public $logger = true;
-
-    public $debug = [];
+    /**
+     * Las cabeceras de la respuesta.
+     *
+     * @var array
+     */
+    public $headers = [];
 
     /**
      * @var \Throwable
      */
     public $exception;
 
-    /**
-     * Guarda los datos de autenticación que se obtuvieron
-     * al momento de autenticar al usuario.
-     *
-     * @var array
-     */
-    public $auth = [];
-
-    public $headers = [];
-
     public function __construct(
-        private ResponseFactory $responseFactory,
-        private Request $request,
+        private ResponseFactory $factory,
+        private bool $debug
     ) {
     }
 
@@ -47,12 +41,7 @@ class ResponseManager
         array $headers = [],
         int $options = 0
     ): JsonResponse {
-        return $this->responseFactory->json(
-            $this->normalizeContent($content),
-            $status,
-            $headers,
-            $options
-        );
+        return $this->response($content, $status, $headers, $options);
     }
 
     public function item(
@@ -61,314 +50,190 @@ class ResponseManager
         array $headers = [],
         int $options = 0
     ): JsonResponse {
-        return $this->responseFactory->json(
-            $this->normalizeContent($content),
-            $status,
-            $headers,
-            $options
-        );
+        if ($this->isEmptyContent($content) and Response::HTTP_OK === $status) {
+            $content = null;
+            $status = Response::HTTP_NOT_FOUND;
+        }
+
+        return $this->response($content, $status, $headers, $options);
     }
 
-    // public function response($content, $status, $message): JsonResponse
-    // {
-    //     $content = $this->normalizeContent($content, $status, $message);
+    public function response($content, $status, $headers, $options): JsonResponse
+    {
+        $data = $content;
 
-    //     // if ($this->logger and to_bool(Config::get('app.request_log'))) {
-    //     //     $this->emitLoggingRequestEvent($content, $status, $message);
-    //     // }
+        if ($content instanceof Collection) {
+            if ($content->isPaginate()) {
+                $data = [
+                    'data' => $content->all(),
+                    ...$content->getMetadata(),
+                ];
+            }
+        }
 
-    //     return $this->responseFactory->json($content, $status, $this->headers);
-    // }
+        return $this->factory->json($data, $status, $headers, $options);
+    }
 
-    // public function registerAuth(array $auth): self
-    // {
-    //     $this->auth = array_merge($this->auth, $auth);
+    public function stored(mixed $content): JsonResponse
+    {
+        return $this->item($content, Response::HTTP_CREATED);
+    }
 
-    //     return $this;
-    // }
+    public function updated(mixed $content): JsonResponse
+    {
+        return $this->item($content, Response::HTTP_ACCEPTED);
+    }
 
-    // public function collection(
-    //     mixed $content,
-    //     int $status = Response::HTTP_OK,
-    //     ?string $message = null
-    // ): JsonResponse {
-    //     return $this->response($content, $status, $message);
-    // }
+    public function destroyed(mixed $content): JsonResponse
+    {
+        return $this->updated($content);
+    }
 
-    // public function item(
-    //     mixed $content,
-    //     int $statusCode = Response::HTTP_OK,
-    //     ?string $message = null
-    // ): JsonResponse {
-    //     if ($this->isEmptyContent($content) and Response::HTTP_OK === $statusCode) {
-    //         $content = null;
-    //         $statusCode = Response::HTTP_NOT_FOUND;
-    //     }
+    public function ok(mixed $content = null): JsonResponse
+    {
+        return $this->collection($content);
+    }
 
-    //     return $this->response($content, $statusCode, $message);
-    // }
+    public function download(string $path, ?string $name = null, bool $deleteFile = true): BinaryFileResponse
+    {
+        $response = $this->factory->download($path, $name);
 
-    // public function stored(mixed $content, ?string $message = null): JsonResponse
-    // {
-    //     return $this->item($content, Response::HTTP_CREATED, $message);
-    // }
+        if ($deleteFile) {
+            $response->deleteFileAfterSend(true);
+        }
 
-    // public function updated(mixed $content, ?string $message = null): JsonResponse
-    // {
-    //     return $this->item($content, Response::HTTP_ACCEPTED, $message);
-    // }
+        return $response;
+    }
 
-    // public function destroyed(mixed $content, ?string $message = null): JsonResponse
-    // {
-    //     return $this->updated($content, $message);
-    // }
+    /**
+     * Captura las excepciones.
+     */
+    public function catch(\Throwable $ex)
+    {
+        $this->exception = $ex;
 
-    // public function ok(mixed $content = null): JsonResponse
-    // {
-    //     return $this->collection($content);
-    // }
+        $params = $this->handleParamsFromException();
 
-    // /**
-    //  * Captura las excepciones.
-    //  *
-    //  * @param \Illuminate\Validation\ValidationException|\Joalvm\Utils\Exceptions\HttpException $ex
-    //  */
-    // public function catch(\Throwable $ex)
-    // {
-    //     $httpCode = $ex->getCode();
-    //     $message = $ex->getMessage();
-    //     $content = null;
+        $content = [
+            'message' => $params['message'],
+            'errors' => $params['content'],
+        ];
 
-    //     $this->headers = $this->getHeaders($ex);
-    //     $this->exception = $ex;
+        if ($this->debug) {
+            $content['trace'] = $this->getTrace($this->exception);
+        }
 
-    //     if ($this->isDeveloper or App::environment('local')) {
-    //         $this->debug = [
-    //             'file' => $ex->getFile() ?? '-',
-    //             'line' => $ex->getLine() ?? '-',
-    //             'trace' => $this->filterExceptionTrace($ex),
-    //         ];
-    //     }
+        return $this->factory->json($content, $params['code'], $this->getHeaders());
+    }
 
-    //     [
-    //         'http_code' => $httpCode,
-    //         'message' => $message,
-    //         'content' => $content
-    //     ] = $this->handleParamsFromException($ex);
+    private function handleParamsFromException(): array
+    {
+        if ($this->exception instanceof \PDOException) {
+            return [
+                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
+                'message' => $this->exception->getMessage(),
+                'content' => null,
+            ];
+        }
 
-    //     return $this->response($content, $httpCode, $message);
-    // }
+        if ($this->isValidationException($this->exception)) {
+            /** @var ValidationException $ex */
+            $ex = $this->exception;
 
-    // public function isDeveloper(bool $isDevelop = true): self
-    // {
-    //     $this->isDeveloper = $isDevelop;
+            return [
+                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                'message' => Lang::get($this->exception->getMessage()),
+                'content' => $ex->errors(),
+            ];
+        }
 
-    //     return $this;
-    // }
+        // Cuando se usa el metodos findOrFail de eloquent
+        if ($this->exception instanceof ModelNotFoundException) {
+            $resourceName = implode(
+                ' ',
+                Str::ucsplit(Str::afterLast($this->exception->getModel(), '\\'))
+            );
 
-    // public function setLog(bool $log = true): self
-    // {
-    //     $this->logger = $log;
+            return [
+                'code' => Response::HTTP_NOT_FOUND,
+                'message' => sprintf('The resource %s could not be found.', $resourceName),
+                'content' => null,
+            ];
+        }
 
-    //     return $this;
-    // }
+        if ($this->exception instanceof HttpException) {
+            return [
+                'code' => $this->exception->getStatusCode(),
+                'message' => Lang::get($this->exception->getMessage()),
+                'content' => !$this->exception->errors() ? null : $this->exception->errors(),
+            ];
+        }
 
-    // /**
-    //  * Is response successful?
-    //  *
-    //  * @final
-    //  */
-    // public function isSuccessfulCode(int $statusCode): bool
-    // {
-    //     return $statusCode >= 200 && $statusCode < 300;
-    // }
+        // Las excepciones de laravel guardan los codigo en en el metodo getStatusCode
+        if ($this->exception instanceof HttpExceptionInterface) {
+            return [
+                'code' => $this->exception->getStatusCode(),
+                'message' => Lang::get($this->exception->getMessage()),
+                'content' => null,
+            ];
+        }
 
-    // // private function emitLoggingRequestEvent(
-    // //     array $content,
-    // //     int $status,
-    // //     ?string $message = null
-    // // ): void {
-    // //     if (App::runningInConsole()) {
-    // //         return;
-    // //     }
+        $httpCode = $this->exception->getCode();
 
-    // //     $info = new RequestInfo($this->request);
+        if (is_string($this->exception->getCode()) or $httpCode < 100 or $httpCode > 599) {
+            $httpCode = Response::HTTP_INTERNAL_SERVER_ERROR;
+        }
 
-    // //     $info->setContent($content)
-    // //         ->setMessage($message ?? Response::$statusTexts[$status])
-    // //         ->setStatus($status)
-    // //         ->setException($this->exception)
-    // //     ;
+        return [
+            'code' => $httpCode,
+            'message' => Lang::get($this->exception->getMessage()),
+            'content' => null,
+        ];
+    }
 
-    // //     LoggingRequestEvent::dispatch($info->get(), $this->auth);
-    // // }
+    private function isValidationException(\Throwable $exception): bool
+    {
+        return $this->exception instanceof ValidationException
+            || $this->exception instanceof UnprocessableEntityException
+            || $this->exception instanceof UnprocessableEntityHttpException;
+    }
 
-    // private function handleParamsFromException(\Throwable $ex): array
-    // {
-    //     if ($ex instanceof \PDOException and App::isProduction()) {
-    //         return [
-    //             'http_code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-    //             'message' => Lang::get('core::database.default'),
-    //             'content' => null,
-    //         ];
-    //     }
-
-    //     if (
-    //         $ex instanceof \Illuminate\Validation\ValidationException
-    //         || $ex instanceof \Joalvm\Utils\Exceptions\UnprocessableEntityException
-    //         || $ex instanceof \Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException
-    //     ) {
-    //         return [
-    //             'http_code' => Response::HTTP_UNPROCESSABLE_ENTITY,
-    //             'message' => Lang::get($ex->getMessage()),
-    //             'content' => $ex->errors(),
-    //         ];
-    //     }
-
-    //     // Cuando se usa el metodos findOrFail de eloquent
-    //     if ($ex instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
-    //         $resourceName = implode(
-    //             ' ',
-    //             Str::ucsplit(Str::afterLast($ex->getModel(), '\\'))
-    //         );
-
-    //         return [
-    //             'http_code' => Response::HTTP_NOT_FOUND,
-    //             'message' => Response::$statusTexts[Response::HTTP_NOT_FOUND],
-    //             'content' => null,
-    //         ];
-    //     }
-
-    //     if ($ex instanceof \Joalvm\Utils\Exceptions\HttpException) {
-    //         return [
-    //             'http_code' => $ex->getStatusCode(),
-    //             'message' => Lang::get($ex->getMessage()),
-    //             'content' => !$ex->errors() ? null : $ex->errors(),
-    //         ];
-    //     }
-
-    //     // Las excepciones de laravel guardan los codigo en en el metodo getStatusCode
-    //     if ($ex instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
-    //         return [
-    //             'http_code' => $ex->getStatusCode(),
-    //             'message' => Lang::get($ex->getMessage()),
-    //             'content' => null,
-    //         ];
-    //     }
-
-    //     $httpCode = $ex->getCode();
-
-    //     if (is_string($ex->getCode()) or $httpCode < 100 or $httpCode > 599) {
-    //         $httpCode = Response::HTTP_INTERNAL_SERVER_ERROR;
-    //     }
-
-    //     return [
-    //         'http_code' => $httpCode,
-    //         'message' => Lang::get($ex->getMessage()),
-    //         'content' => null,
-    //     ];
-    // }
-
-    private function getHeaders(\Throwable $exception): array
+    private function getHeaders(): array
     {
         $headers = [];
 
-        if ($exception instanceof \Joalvm\Utils\Exceptions\HttpException) {
-            $headers = $exception->getHeaders();
+        if ($this->exception instanceof HttpException) {
+            $headers = $this->exception->getHeaders();
         }
 
-        if ($exception instanceof \Illuminate\Validation\ValidationException) {
-            $headers = $exception->response?->headers?->all() ?? [];
+        if ($this->exception instanceof ValidationException) {
+            $headers = $this->exception->response?->headers?->all() ?? [];
         }
 
         return $headers;
     }
 
-    /**
-     * Maneja la estructura de la respuesta.
-     */
-    private function normalizeContent(mixed $content): mixed
+    private function isEmptyContent(mixed $content): bool
     {
-        if ($content instanceof Collection) {
-            $meta = [];
-
-            if ($content->isPaginate()) {
-                return ['data' => $content->all(), ...$content->getMetadata()];
-            }
-
-            return $content->all();
+        if ($content instanceof \Countable) {
+            return 0 === count($content);
         }
 
-        return $content;
+        if (is_object($content) and method_exists($content, 'isEmpty')) {
+            return $content->isEmpty();
+        }
+
+        return empty($content);
     }
 
-    // /**
-    //  * Añade los datos de debug a la respuesta.
-    //  * Si la aplicación está en modo debug, se añaden los datos de debug.
-    //  */
-    // private function setDebugToContent(array $body): array
-    // {
-    //     if ($this->debug) {
-    //         $body['debug'] = $this->debug;
-    //     }
+    private function getTrace(): ?string
+    {
+        $trace = (string) mb_convert_encoding($this->exception, 'UTF-8');
 
-    //     return $body;
-    // }
+        if (empty($trace)) {
+            return null;
+        }
 
-    // private function isEmptyContent(mixed $content): bool
-    // {
-    //     if ($content instanceof \Countable) {
-    //         return 0 === count($content);
-    //     }
-
-    //     if (is_object($content) and method_exists($content, 'isEmpty')) {
-    //         return $content->isEmpty();
-    //     }
-
-    //     return empty($content);
-    // }
-
-    // private function getUniqueRequestId(): array
-    // {
-    //     if ($this->request->server->has('UNIQUE_ID')) {
-    //         return ['id' => $this->request->server('UNIQUE_ID')];
-    //     }
-
-    //     if ($this->request->server->has('HTTP_X_REQUEST_ID')) {
-    //         return ['id' => $this->request->server('HTTP_X_REQUEST_ID')];
-    //     }
-
-    //     // AWS ELB
-    //     if ($this->request->server->has('HTTP_X_AMZN_TRACE_ID')) {
-    //         return ['id' => $this->request->server('HTTP_X_AMZN_TRACE_ID')];
-    //     }
-
-    //     return [];
-    // }
-
-    // private function filterExceptionTrace(\Throwable $exception): array
-    // {
-    //     return array_map(
-    //         function ($value) {
-    //             $filepath = ltrim(
-    //                 str_replace(
-    //                     'vendor' . DIRECTORY_SEPARATOR,
-    //                     '',
-    //                     Arr::get($value, 'file', '')
-    //                 ),
-    //                 '/'
-    //             );
-
-    //             return sprintf(
-    //                 '%s(:%s) %s%s%s()',
-    //                 $filepath,
-    //                 Arr::get($value, 'line', ''),
-    //                 Arr::get($value, 'class', ''),
-    //                 Arr::get($value, 'type', ''),
-    //                 Arr::get($value, 'function', ''),
-    //             );
-    //         },
-    //         $exception->getTrace() ?? []
-    //     );
-    // }
+        return $trace;
+    }
 }

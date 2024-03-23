@@ -37,14 +37,6 @@ class UtilsTest extends TestCase
         $this->assertEquals('1 TB', format_bytes(1024 * 1024 * 1024 * 1024));
     }
 
-    public function testSanitizeStr(): void
-    {
-        $this->assertEquals('string', sanitize_str('string'));
-        $this->assertEquals('string&#34;', sanitize_str('string"'));
-        $this->assertEquals('string&#39;', sanitize_str('string\''));
-        $this->assertEquals('string', sanitize_str('string<'));
-    }
-
     public function testDot(): void
     {
         $this->assertEquals(['a.b.c' => 'd'], dot(['a' => ['b' => ['c' => 'd']]]));

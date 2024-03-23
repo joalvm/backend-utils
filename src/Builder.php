@@ -68,12 +68,12 @@ class Builder extends BaseBuilder
             return parent::from($tableName, $as);
         }
 
-        list($table, $alias) = $this->resolveTableAs($tableName);
+        list($table, $alias) = $this->resolveTableAs($tableName, $as);
 
-        $this->schema->setFromAs($as ?? $alias);
+        $this->schema->setFromAs($alias);
         $this->registerColumns();
 
-        return parent::from($table, $as ?? $alias);
+        return parent::from($table, $alias);
     }
 
     public function fromSub($query, $as)
@@ -163,6 +163,13 @@ class Builder extends BaseBuilder
         return Item::make($item)->schematize($this->fnCasts);
     }
 
+    public function forcePaginate(): self
+    {
+        $this->paginate->setPaginate(true);
+
+        return $this;
+    }
+
     /**
      * Añade al inicio de la lista de where la condición de que el id sea igual al valor.
      *
@@ -195,7 +202,7 @@ class Builder extends BaseBuilder
 
         return $this->paginate(
             $this->paginate->getPerPage(),
-            $this->schema->getValues(),
+            $this->columns,
             Paginate::PARAMETER_PAGE_NAME,
             $this->paginate->getPage()
         );
@@ -233,30 +240,26 @@ class Builder extends BaseBuilder
         if ($item[0] instanceof Expression) {
             /** @var Expression $column */
             $column = $item[0];
-            $this->addSelect(
-                DB::raw(
-                    sprintf(
-                        '(%s) as "%s"',
-                        $column->getValue($this->getGrammar()),
-                        $item[1]
-                    )
-                )
+            $expression = sprintf(
+                '(%s) as "%s"',
+                $column->getValue($this->getGrammar()),
+                $item[1]
             );
+
+            $this->addSelect(DB::raw($expression));
 
             return;
         }
     }
 
-    private function resolveTableAs(string $tableName): array
+    private function resolveTableAs(string $value, ?string $as): array
     {
-        $tableName = str_replace(' as ', ' AS ', $tableName);
+        $segments = preg_split('/\s+(?:as\s+)?/i', $value);
 
-        return (2 == count($parts = explode(' AS ', $tableName)))
-            ? $parts
-            : (
-                2 == count($parts = explode(' ', $tableName))
-                    ? $parts
-                    : [$tableName, $tableName]
-            );
+        if (2 === count($segments)) {
+            return [$segments[0], $as ?? $segments[1]];
+        }
+
+        return [$value, $as ?? $value];
     }
 }

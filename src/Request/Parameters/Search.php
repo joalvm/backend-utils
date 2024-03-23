@@ -19,8 +19,6 @@ class Search
             Arr::get($contains, self::PARAMETER_NAME, [])
         );
 
-        $text = sanitize_str($text ?? '');
-
         if (empty($items)) {
             $items = [];
         }
