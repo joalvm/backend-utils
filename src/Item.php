@@ -195,7 +195,7 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
      */
     public function castFloatValues(
         array $keys,
-        int $precision = 0,
+        int $precision = -1,
         int $mode = PHP_ROUND_HALF_UP
     ): void {
         foreach ($keys as $key) {
@@ -210,7 +210,7 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
     /**
      * Alias de castFloatValues.
      */
-    public function floatValues(array $keys, int $precision = 0, int $mode = PHP_ROUND_HALF_UP): void
+    public function floatValues(array $keys, int $precision = -1, int $mode = PHP_ROUND_HALF_UP): void
     {
         $this->castFloatValues($keys, $precision, $mode);
     }
