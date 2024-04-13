@@ -8,7 +8,22 @@ if (!function_exists('to_str')) {
      */
     function to_str($value): ?string
     {
-        return !strlen($value = trim(strval($value))) ? null : $value;
+        if (is_string($value) or is_scalar($value) or is_null($value)) {
+            if (0 === strlen($value = trim(strval($value)))) {
+                return null;
+            }
+
+            return $value;
+        }
+
+        if (
+            is_object($value)
+            and ($value instanceof Stringable or method_exists($value, '__toString'))
+        ) {
+            return to_str($value->__toString());
+        }
+
+        return null;
     }
 }
 
@@ -24,7 +39,7 @@ if (!function_exists('to_int')) {
             return $value;
         }
 
-        if (is_numeric($value = is_string($value) ? to_str($value) : $value)) {
+        if (is_numeric($value)) {
             return intval($value);
         }
 
@@ -46,7 +61,7 @@ if (!function_exists('to_float')) {
             return $precision < 0 ? $value : round($value, $precision, $mode);
         }
 
-        if (is_numeric($value = is_string($value) ? to_str($value) : $value)) {
+        if (is_numeric($value)) {
             return $precision < 0
                 ? floatval($value)
                 : round(floatval($value), $precision, $mode);
@@ -88,12 +103,19 @@ if (!function_exists('to_bool')) {
             return boolval($value);
         }
 
-        if (is_string($value) or is_int($value)) {
-            if (preg_match('/^(true|1|yes|on|y|t)$/i', to_str($value))) {
+        if (is_int($value)) {
+            return match ($value) {
+                1 => true,
+                0 => false,
+            };
+        }
+
+        if (is_string($value)) {
+            if (preg_match('/^(true|1|yes|on|y|t)$/i', trim($value))) {
                 return true;
             }
 
-            if (preg_match('/^(false|0|no|n|off|f)$/i', to_str($value))) {
+            if (preg_match('/^(false|0|no|n|off|f)$/i', trim($value))) {
                 return false;
             }
         }

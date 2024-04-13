@@ -9,15 +9,15 @@ class UtilsServiceProvider extends ServiceProvider
 {
     public function boot()
     {
-        $this->app->singleton('joalvm.response', function (Application $app) {
-            return new ResponseManager(
-                $app->get(\Illuminate\Contracts\Routing\ResponseFactory::class),
-                $app->get('config')->get('app.debug')
-            );
-        });
     }
 
     public function register()
     {
+        $this->app->singleton(ResponseManager::class, function (Application $app) {
+            return new ResponseManager(
+                $app->get(\Illuminate\Contracts\Routing\ResponseFactory::class),
+                $app->get('config')->get('app.debug', false)
+            );
+        });
     }
 }

@@ -6,6 +6,7 @@ namespace Joalvm\Utils\Facades;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Facade;
+use Joalvm\Utils\ResponseManager;
 
 /**
  * @method static JsonResponse       collection(mixed $content, int $status = BaseResponse::HTTP_OK, array $headers = [], int $options = 0) Devuelve la estructura de una respuesta para una colección de datos.
@@ -23,6 +24,6 @@ class Response extends Facade
 {
     protected static function getFacadeAccessor()
     {
-        return 'joalvm.response';
+        return ResponseManager::class;
     }
 }

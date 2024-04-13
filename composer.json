@@ -59,6 +59,9 @@
             "providers": [
                 "Joalvm\\Utils\\UtilsServiceProvider"
             ]
+        },
+        "branch-alias": {
+            "dev-master": "2.0-dev"
         }
     }
 }

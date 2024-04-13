@@ -31,7 +31,7 @@ class ResponseManager
 
     public function __construct(
         private ResponseFactory $factory,
-        private bool $debug
+        private bool $debug = false,
     ) {
     }
 
