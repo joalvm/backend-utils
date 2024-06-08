@@ -193,9 +193,9 @@ class ResponseManager
 
     private function isValidationException(\Throwable $exception): bool
     {
-        return $this->exception instanceof ValidationException
-            || $this->exception instanceof UnprocessableEntityException
-            || $this->exception instanceof UnprocessableEntityHttpException;
+        return $exception instanceof ValidationException
+            || $exception instanceof UnprocessableEntityException
+            || $exception instanceof UnprocessableEntityHttpException;
     }
 
     private function getHeaders(): array
