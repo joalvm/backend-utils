@@ -37,7 +37,7 @@ class Model extends EloquentModel
      *
      * Añadimos la funcionalidad en caso sea null o string lo devolvemos tal cual.
      */
-    protected function getStorableEnumValue($value)
+    protected function getStorableEnumValue($expectedEnum, $value)
     {
         if (is_null($value) or is_string($value)) {
             return $value;
@@ -45,6 +45,6 @@ class Model extends EloquentModel
 
         return $value instanceof \BackedEnum
                 ? $value->value
-                : $value->name;
+                : ($expectedEnum ?? $value->name);
     }
 }

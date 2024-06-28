@@ -23,7 +23,7 @@ class TimestamptzCast implements CastsAttributes
             return Carbon::createFromTimestamp($value);
         }
 
-        return Carbon::parse($this->normalizeStrDateTime($value));
+        return Carbon::parse($this->normalizeStrDateTime($value))->toImmutable();
     }
 
     /**

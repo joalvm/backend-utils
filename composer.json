@@ -25,10 +25,10 @@
     },
     "require": {
         "php": "^8.1||^8.2",
-        "illuminate/database": "^8.83||^9.35||^10.11",
-        "illuminate/http": "^8.83||^9.35||^10.11",
-        "illuminate/pagination": "^8.83||^9.35||^10.11",
-        "illuminate/validation": "^8.83||^9.35||^10.11",
+        "illuminate/database": "^9.35||^10.11||^11.0",
+        "illuminate/http": "^9.35||^10.11||^11.0",
+        "illuminate/pagination": "^9.35||^10.11||^11.0",
+        "illuminate/validation": "^9.35||^10.11||^11.0",
         "firebase/php-jwt": "^6.10",
         "symfony/polyfill-php83": "^1.29"
     },
