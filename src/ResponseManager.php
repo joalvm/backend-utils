@@ -32,8 +32,7 @@ class ResponseManager
     public function __construct(
         private ResponseFactory $factory,
         private bool $debug = false,
-    ) {
-    }
+    ) {}
 
     public function collection(
         mixed $content,
@@ -148,10 +147,17 @@ class ResponseManager
         }
 
         // Cuando se usa el metodos findOrFail de eloquent
-        if ($this->exception instanceof ModelNotFoundException) {
+        if (
+            $this->exception instanceof ModelNotFoundException
+            or $this->exception->getPrevious() instanceof ModelNotFoundException
+        ) {
+            $modelName = $this->exception instanceof ModelNotFoundException
+                ? $this->exception->getModel()
+                : call_user_func([$this->exception->getPrevious(), 'getModel']);
+
             $resourceName = implode(
                 ' ',
-                Str::ucsplit(Str::afterLast($this->exception->getModel(), '\\'))
+                Str::ucsplit(Str::afterLast($modelName, '\\'))
             );
 
             return [

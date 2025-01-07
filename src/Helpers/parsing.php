@@ -158,9 +158,9 @@ if (!function_exists('to_list_int')) {
     /**
      * Castea un valor a una lista de enteros, si es un string se separa por comas.
      *
-     * @param mixed $values
+     * @return int[]
      */
-    function to_list_int($values, bool $keepNulls = false, string $separator = ','): array
+    function to_list_int(mixed $values, bool $keepNulls = false, string $separator = ','): array
     {
         $array = [];
 
@@ -184,10 +184,10 @@ if (!function_exists('to_list_float')) {
     /**
      * Castea un valor a una lista de flotantes, si es un string se separa por comas.
      *
-     * @param mixed $values
+     * @return float[]
      */
     function to_list_float(
-        $values,
+        mixed $values,
         bool $keepNulls = false,
         int $precision = -1,
         int $mode = PHP_ROUND_HALF_UP,
@@ -215,10 +215,10 @@ if (!function_exists('to_list_numeric')) {
     /**
      * Castea un valor a una lista de enteros o flotantes, si es un string se separa por comas.
      *
-     * @param mixed $values
+     * @return array<float|int>
      */
     function to_list_numeric(
-        $values,
+        mixed $values,
         bool $keepNulls = false,
         int $precision = -1,
         int $mode = PHP_ROUND_HALF_UP,
@@ -246,10 +246,13 @@ if (!function_exists('to_list_bool')) {
     /**
      * Castea un valor a una lista de booleano, si es un string se separa por comas.
      *
-     * @param mixed $values
+     * @return bool[]
      */
-    function to_list_bool($values, bool $keepNulls = false, string $separator = ','): array
-    {
+    function to_list_bool(
+        mixed $values,
+        bool $keepNulls = false,
+        string $separator = ','
+    ): array {
         $array = [];
 
         foreach (to_list($values, $keepNulls, $separator) as $value) {
