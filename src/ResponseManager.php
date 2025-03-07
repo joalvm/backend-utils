@@ -32,7 +32,8 @@ class ResponseManager
     public function __construct(
         private ResponseFactory $factory,
         private bool $debug = false,
-    ) {}
+    ) {
+    }
 
     public function collection(
         mixed $content,
@@ -232,14 +233,14 @@ class ResponseManager
         return empty($content);
     }
 
-    private function getTrace(): ?string
+    private function getTrace(): array
     {
         $trace = (string) mb_convert_encoding($this->exception, 'UTF-8');
 
         if (empty($trace)) {
-            return null;
+            return [];
         }
 
-        return $trace;
+        return explode("\n", $trace);
     }
 }

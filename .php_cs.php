@@ -17,7 +17,7 @@ $finder = Finder::create()
 ;
 
 $rules = [
-    '@PhpCsFixer' => true,
+    '@PSR12' => true,
     'single_line_throw' => false,
     'no_empty_comment' => false,
     'new_with_braces' => false,

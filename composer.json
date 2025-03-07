@@ -24,12 +24,12 @@
         "cs-fixer": "php-cs-fixer fix . --using-cache=no --config=.php_cs.php"
     },
     "require": {
-        "php": "^8.1||^8.2",
-        "illuminate/database": "^9.35||^10.11||^11.0",
-        "illuminate/http": "^9.35||^10.11||^11.0",
-        "illuminate/pagination": "^9.35||^10.11||^11.0",
-        "illuminate/validation": "^9.35||^10.11||^11.0",
-        "firebase/php-jwt": "^6.10",
+        "php": "^8.2||^8.3",
+        "illuminate/database": "^10.11||^11.0||^12.0",
+        "illuminate/http": "^10.11||^11.0||^12.0",
+        "illuminate/pagination": "^10.11||^11.0||^12.0",
+        "illuminate/validation": "^10.11||^11.0||^12.0",
+        "firebase/php-jwt": "^6.11",
         "symfony/polyfill-php83": "^1.29"
     },
     "require-dev": {
