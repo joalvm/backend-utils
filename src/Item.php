@@ -5,100 +5,13 @@ namespace Joalvm\Utils;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Fluent;
 
-class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Stringable, \Countable
+class Item extends Fluent implements \Stringable, \Countable
 {
-    /**
-     * Todos los atributos establecidos en la instancia del Item.
-     *
-     * @var array
-     */
-    protected $attributes = [];
-
-    /**
-     * Crea una nueva instancia Item.
-     *
-     * @param array|\ArrayAccess|\stdClass $attributes
-     */
-    public function __construct($attributes = [])
-    {
-        if (
-            !is_array($attributes)
-            and !($attributes instanceof \ArrayAccess)
-            and !($attributes instanceof \stdClass)
-        ) {
-            $attributes = [];
-        }
-
-        if ($attributes instanceof \stdClass or $attributes instanceof \ArrayAccess) {
-            $attributes = (array) $attributes;
-        }
-
-        $this->attributes = $attributes;
-    }
-
     public function __toString()
     {
         return $this->toJson(JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    }
-
-    /**
-     * Manejar llamadas dinámicas a la instancia Item para establecer atributos.
-     *
-     * @param string $method
-     * @param array  $parameters
-     *
-     * @return $this
-     */
-    public function __call($method, $parameters)
-    {
-        $this->attributes[$method] = count($parameters) > 0 ? $parameters[0] : true;
-
-        return $this;
-    }
-
-    /**
-     * Recuperar dinámicamente el valor de un atributo.
-     *
-     * @param string $key
-     */
-    public function __get($key)
-    {
-        return $this->get($key);
-    }
-
-    /**
-     * Establecer dinámicamente el valor de un atributo.
-     *
-     * @param mixed $value
-     */
-    public function __set(string $key, $value): void
-    {
-        $this->set($key, $value);
-    }
-
-    /**
-     * Verifica dinámicamente si un atributo existe.
-     *
-     * @param string $name
-     *
-     * @return bool
-     */
-    public function __isset($name)
-    {
-        return $this->offsetExists($name);
-    }
-
-    /**
-     * Remueve dinámicamente un atributo.
-     *
-     * @param string $name
-     */
-    public function __unset($name)
-    {
-        $this->offsetUnset($name);
-
-        return true;
     }
 
     public static function make($attributes = []): self
@@ -114,9 +27,9 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
     /**
      * Elimina un atributo de la instancia Item.
      *
-     * @param array|float|int|string $keys
+     * @param TKey|array<TKey> $keys
      */
-    public function forget(mixed $keys): void
+    public function forget(...$keys): void
     {
         Arr::forget($this->attributes, $keys);
     }
@@ -276,15 +189,10 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
      */
     public function keys(): array
     {
-        return array_keys($this->attributes);
+        return array_keys(Arr::dot($this->attributes));
     }
 
-    /**
-     * Obtener un atributo de la instancia Item.
-     *
-     * @param null|mixed $default
-     */
-    public function get(string $key, $default = null)
+    public function get($key, $default = null)
     {
         if (Arr::has($this->attributes, $key)) {
             return Arr::get($this->attributes, $key);
@@ -336,16 +244,6 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
     }
 
     /**
-     * Convierta el objeto en un JSON serializable.
-     *
-     * @return array
-     */
-    public function jsonSerialize(): mixed
-    {
-        return $this->toArray();
-    }
-
-    /**
      * Convierte la instancia Item en un JSON.
      *
      * @param int $options
@@ -357,40 +255,16 @@ class Item implements Arrayable, \ArrayAccess, Jsonable, \JsonSerializable, \Str
         return json_encode($this->jsonSerialize(), $options);
     }
 
-    /**
-     * Determina si un atributo existe.
-     *
-     * @param string $offset
-     */
     public function offsetExists($offset): bool
     {
         return $this->has($offset);
     }
 
-    /**
-     * Obtener el valor de un atributo determinado.
-     */
-    public function offsetGet(mixed $offset): mixed
-    {
-        return $this->get($offset);
-    }
-
-    /**
-     * Establecer el valor en el offset dado.
-     *
-     * @param string $offset
-     * @param mixed  $value
-     */
     public function offsetSet($offset, $value): void
     {
         Arr::set($this->attributes, $offset, $value);
     }
 
-    /**
-     * Remueve el valor en el offset dado.
-     *
-     * @param string $offset
-     */
     public function offsetUnset($offset): void
     {
         Arr::forget($this->attributes, $offset);
