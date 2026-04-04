@@ -13,52 +13,52 @@ use PHPUnit\Framework\TestCase;
  */
 class ParsingTest extends TestCase
 {
-    public function testToStr(): void
+    public function test_to_str(): void
     {
         $this->assertSame('string', to_str('  string  '));
     }
 
-    public function testToInt(): void
+    public function test_to_int(): void
     {
         $this->assertSame(1, to_int('1'));
     }
 
-    public function testToFloat(): void
+    public function test_to_float(): void
     {
         $this->assertSame(1.0, to_float('1'));
     }
 
-    public function testToFloatWithPrecision(): void
+    public function test_to_float_with_precision(): void
     {
         $this->assertSame(1.1, to_float('1.09', 1));
         $this->assertSame(1.52, to_float('1.519', 2));
     }
 
-    public function testToFloatWithPrecisionAndMode(): void
+    public function test_to_float_with_precision_and_mode(): void
     {
         $this->assertSame(1.5, to_float('1.45', 1, PHP_ROUND_HALF_UP));
         $this->assertSame(1.4, to_float('1.45', 1, PHP_ROUND_HALF_DOWN));
     }
 
-    public function testToNumeric(): void
+    public function test_to_numeric(): void
     {
         $this->assertSame(1, to_numeric('1'));
         $this->assertSame(1.0, to_numeric('1.0'));
     }
 
-    public function testToNumericWithPrecision(): void
+    public function test_to_numeric_with_precision(): void
     {
         $this->assertSame(1.1, to_numeric('1.09', 1));
         $this->assertSame(1.52, to_numeric('1.519', 2));
     }
 
-    public function testToNumericWithPrecisionAndMode(): void
+    public function test_to_numeric_with_precision_and_mode(): void
     {
         $this->assertSame(1.5, to_numeric('1.45', 1, PHP_ROUND_HALF_UP));
         $this->assertSame(1.4, to_numeric('1.45', 1, PHP_ROUND_HALF_DOWN));
     }
 
-    public function testToBool(): void
+    public function test_to_bool(): void
     {
         $this->assertTrue(to_bool('true'));
         $this->assertFalse(to_bool('false'));
@@ -74,31 +74,31 @@ class ParsingTest extends TestCase
         $this->assertFalse(to_bool('f'));
     }
 
-    public function testToList(): void
+    public function test_to_list(): void
     {
         $this->assertSame(['a', 'b', 'c'], to_list('a,b,c'));
         $this->assertSame(['a', 'b', 'c'], to_list(['a', 'b', 'c']));
     }
 
-    public function testToListWithEmptyValues(): void
+    public function test_to_list_with_empty_values(): void
     {
         $this->assertSame(['a', 'b', null, 'c'], to_list('a,b,,c', true));
         $this->assertSame(['a', 'b', 'c'], to_list('a,b,,c', false));
     }
 
-    public function testToListInt(): void
+    public function test_to_list_int(): void
     {
         $this->assertSame([1, 2, 3], to_list_int('1,2,3,a'));
         $this->assertSame([1, 2, 3], to_list_int([1, 2, 3, 'a']));
     }
 
-    public function testToListIntWithEmptyValues(): void
+    public function test_to_list_int_with_empty_values(): void
     {
         $this->assertSame([1, 2, null, 3], to_list_int('1,2,,3,a', true));
         $this->assertSame([1, 2, 3], to_list_int('1,2,,3,a', false));
     }
 
-    public function testToListFloat(): void
+    public function test_to_list_float(): void
     {
         $this->assertSame([1.0, 2.0, 3.0], to_list_float('1.0,2.0,3.0,a'));
         $this->assertSame([1.0, 2.0, 3.0], to_list_float([1.0, 2.0, 3.0, 'a']));
@@ -110,13 +110,13 @@ class ParsingTest extends TestCase
         $this->assertSame([1.11, 2.22, 3.33], to_list_float('1.115,2.222,3.333,a', false, 2, PHP_ROUND_HALF_DOWN));
     }
 
-    public function testToListFloatWithEmptyValues(): void
+    public function test_to_list_float_with_empty_values(): void
     {
         $this->assertSame([1.0, 2.0, null, 3.0], to_list_float('1.0,2,,3.0,a', true));
         $this->assertSame([1.0, 2.0, 3.0], to_list_float('1.0,2,,3.0,a', false));
     }
 
-    public function testToListNumeric(): void
+    public function test_to_list_numeric(): void
     {
         $this->assertSame([1, 2, 3, 4.0], to_list_numeric('1,2,3,4.0,a'));
         $this->assertSame([1, 2, 3, 4.0], to_list_numeric([1, 2, 3, '4.0', 'a']));
@@ -128,19 +128,19 @@ class ParsingTest extends TestCase
         $this->assertSame([1.11, 2.22, 3.33, 4.44], to_list_numeric('1.115,2.222,3.333,4.444,a', false, 2, PHP_ROUND_HALF_DOWN));
     }
 
-    public function testToListNumericWithEmptyValues(): void
+    public function test_to_list_numeric_with_empty_values(): void
     {
         $this->assertSame([1, 2, null, 3, 4.0], to_list_numeric('1,2,,3,4.0,a', true));
         $this->assertSame([1, 2, 3, 4.0], to_list_numeric('1,2,,3,4.0,a', false));
     }
 
-    public function testToListBool(): void
+    public function test_to_list_bool(): void
     {
         $this->assertSame([true, false, true, false], to_list_bool('true,0,yes,false'));
         $this->assertSame([true, false, true, false], to_list_bool([true, false, 'yes', 'false']));
     }
 
-    public function testToListBoolWithEmptyValues(): void
+    public function test_to_list_bool_with_empty_values(): void
     {
         $this->assertSame([true, false, null, true, false], to_list_bool('true,0,,yes,false', true));
         $this->assertSame([true, false, true, false], to_list_bool('true,0,,yes,false', false));

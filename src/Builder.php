@@ -47,12 +47,12 @@ class Builder extends BaseBuilder
         $this->sort = new Sort(Request::query());
     }
 
-    public static function connection(string $name = null): self
+    public static function connection(?string $name = null): self
     {
         return new static(DB::connection($name));
     }
 
-    public static function table(string $table, string $as = null): self
+    public static function table(string $table, ?string $as = null): self
     {
         return (new static())->from($table, $as);
     }
@@ -109,7 +109,7 @@ class Builder extends BaseBuilder
     /**
      * Funcion que castea cada item.
      *
-     * @param callable(Item): void $callback
+     * @param callable(Item $item): void $callback
      */
     public function casts(callable $callback): self
     {
@@ -171,6 +171,18 @@ class Builder extends BaseBuilder
     }
 
     /**
+     * Desactiva el filtro de items del esquema.
+     *
+     * @return self
+     */
+    public function disableSchemaFilter(): self
+    {
+        $this->schema->disableFilterItems();
+
+        return $this;
+    }
+
+    /**
      * Añade al inicio de la lista de where la condición de que el id sea igual al valor.
      *
      * @return self
@@ -226,29 +238,16 @@ class Builder extends BaseBuilder
         }
     }
 
-    private function registerCustomColum($item)
+    private function registerCustomColum($item): void
     {
-        if ($this->isQueryable($item[0])) {
-            $this->selectSub(
-                $item[0],
-                $this->grammar->quoteString($item[1])
-            );
-
-            return;
-        }
-
         if ($item[0] instanceof Expression) {
-            /** @var Expression $column */
-            $column = $item[0];
-            $expression = sprintf(
-                '(%s) as "%s"',
-                $column->getValue($this->getGrammar()),
-                $item[1]
-            );
+            $column = $item[0]->getValue($this->grammar);
+
+            $expression = sprintf('(%s) as %s', $column, $this->wrapAs($item[1]));
 
             $this->addSelect(DB::raw($expression));
-
-            return;
+        } elseif ($this->isQueryable($item[0])) {
+            $this->selectSub($item[0], $this->wrapAs($item[1]));
         }
     }
 
@@ -261,5 +260,13 @@ class Builder extends BaseBuilder
         }
 
         return [$value, $as ?? $value];
+    }
+
+    private function wrapAs(string $as)
+    {
+        $as = trim($as, '"\'][`');
+        return DB::raw(
+            str_replace('&', '.', $this->grammar->wrap(str_replace('.', '&', $as)))
+        );
     }
 }

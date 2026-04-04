@@ -2,6 +2,8 @@
 
 namespace Joalvm\Utils\Request\Parameters;
 
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Database\Query\Grammars\Grammar;
 use Illuminate\Support\Arr;
@@ -47,6 +49,13 @@ class Schema
      */
     private Grammar $grammar;
 
+    /**
+     * Indica si los items del esquema pueden ser filtrados.
+     *
+     * @var boolean
+     */
+    private bool $filterable;
+
     public function __construct(mixed $schema, Grammar $grammar)
     {
         $this->handleSchema(Arr::get($schema, self::PARAMETER__NAME, []));
@@ -89,7 +98,11 @@ class Schema
                 continue;
             }
 
-            $columns[] = sprintf('%s as "%s"', $this->grammar->wrapTable($column), $as);
+            $columns[] = sprintf(
+                '%s as %s',
+                $this->grammar->wrapTable($column),
+                str_replace('&', '.', ($this->grammar->wrap(str_replace('.', '&', $as))))
+            );
         }
 
         return $columns;
@@ -100,7 +113,7 @@ class Schema
         $keys = [];
 
         // Si no se ha filtrado el esqueema, se retornan todas las claves.
-        if (!$this->matches) {
+        if (!$this->matches || $this->filterable === false) {
             return $this->keys;
         }
 
@@ -119,6 +132,13 @@ class Schema
     public function exists(string $key): bool
     {
         return in_array($key, $this->keys);
+    }
+
+    public function disableFilterItems(): self
+    {
+        $this->filterable = false;
+
+        return $this;
     }
 
     /**
@@ -362,16 +382,16 @@ class Schema
         }
 
         return \preg_match(
-            '/^(([a-zA-Z])(\\w+)?\\.)?([a-zA-Z]\\w+|_)$/i',
+            '/^(([a-zA-Z])(\w+)?\.)?([a-zA-Z]\w+|_)$/i',
             $ColumnAlias
         );
     }
 
     private function isQueryable($value)
     {
-        return $value instanceof \Illuminate\Database\Query\Builder
+        return $value instanceof Builder
                 || $value instanceof \Illuminate\Database\Eloquent\Builder
-               || $value instanceof \Illuminate\Database\Eloquent\Relations\Relation
+               || $value instanceof Relation
                || $value instanceof \Closure;
     }
 }

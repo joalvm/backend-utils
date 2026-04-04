@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
  */
 class CastTest extends TestCase
 {
-    public function testCastAssocInt(): void
+    public function test_cast_assoc_int(): void
     {
         $item = ['a' => '1', 'b' => '2', 'c' => '3'];
 
@@ -22,7 +22,7 @@ class CastTest extends TestCase
         $this->assertSame(['a' => 1, 'b' => 2, 'c' => '3'], $item);
     }
 
-    public function testCastAssocFloat(): void
+    public function test_cast_assoc_float(): void
     {
         $item = ['a' => '1.1', 'b' => '2.2', 'c' => '3.3'];
 
@@ -31,7 +31,7 @@ class CastTest extends TestCase
         $this->assertSame(['a' => 1.1, 'b' => 2.2, 'c' => '3.3'], $item);
     }
 
-    public function testCastAssocFloatWithPrecision(): void
+    public function test_cast_assoc_float_with_precision(): void
     {
         $item = ['a' => '1.111', 'b' => '2.222', 'c' => '3.333'];
 
@@ -40,7 +40,7 @@ class CastTest extends TestCase
         $this->assertSame(['a' => 1.11, 'b' => 2.22, 'c' => '3.333'], $item);
     }
 
-    public function testCastAssocFloatWithModeRoundHalfUp(): void
+    public function test_cast_assoc_float_with_mode_round_half_up(): void
     {
         $item = ['a' => '1.5', 'b' => '2.5', 'c' => '3.5'];
 
@@ -49,7 +49,7 @@ class CastTest extends TestCase
         $this->assertSame(['a' => 2.0, 'b' => 3.0, 'c' => '3.5'], $item);
     }
 
-    public function testCastAssocFloatWithModeRoundHalfDown(): void
+    public function test_cast_assoc_float_with_mode_round_half_down(): void
     {
         $item = ['a' => '1.5', 'b' => '2.5', 'c' => '3.5'];
 
@@ -58,7 +58,7 @@ class CastTest extends TestCase
         $this->assertSame(['a' => 1.0, 'b' => 2.0, 'c' => '3.5'], $item);
     }
 
-    public function testCastAssocFloatWithModelRoundHalfEven(): void
+    public function test_cast_assoc_float_with_model_round_half_even(): void
     {
         $item = ['a' => '1.5', 'b' => '2.5', 'c' => '3.5'];
 
@@ -67,7 +67,7 @@ class CastTest extends TestCase
         $this->assertSame(['a' => 2.0, 'b' => 2.0, 'c' => '3.5'], $item);
     }
 
-    public function testCastAssocFloatWithModelRoundHalfOdd(): void
+    public function test_cast_assoc_float_with_model_round_half_odd(): void
     {
         $item = ['a' => '1.5', 'b' => '2.5', 'c' => '3.5'];
 
@@ -76,7 +76,7 @@ class CastTest extends TestCase
         $this->assertSame(['a' => 1.0, 'b' => 3.0, 'c' => '3.5'], $item);
     }
 
-    public function testCastAssocNumeric(): void
+    public function test_cast_assoc_numeric(): void
     {
         $item = ['a' => '1.1', 'b' => '2.2', 'c' => '3.3'];
 

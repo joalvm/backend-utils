@@ -25,27 +25,15 @@ trait ValidatesAttributes
      */
     public function validate(): static
     {
-        $this->initValidation(
-            Arr::except(
+        if ($this->rules()) {
+            $data = Arr::except(
                 $this->getAttributes(),
-                ['created_at', 'modified_at', 'updated_at']
-            ),
-            $this->rules()
-        );
+                ['created_at', 'updated_at', 'deleted_at']
+            );
+
+            Validator::make($data, $this->rules())->validate();
+        }
 
         return $this;
-    }
-
-    /**
-     * Inicializa la validación de los atributos del modelo.
-     *
-     * @param array $data  los datos a validar
-     * @param array $rules las reglas de validación
-     *
-     * @throws ValidationException si la validación falla
-     */
-    protected function initValidation(array $data, array $rules): void
-    {
-        Validator::make($data, $rules)->validate();
     }
 }

@@ -14,42 +14,42 @@ use PHPUnit\Framework\TestCase;
  */
 class ItemTest extends TestCase
 {
-    public function testConstructor(): void
+    public function test_constructor(): void
     {
         $item = new Item(['a' => 'b']);
 
         $this->assertSame(['a' => 'b'], $item->toArray());
     }
 
-    public function testConstructorWithArrayAccess(): void
+    public function test_constructor_with_array_access(): void
     {
         $item = new Item(new \ArrayObject(['a' => 'b']));
 
         $this->assertSame(['a' => 'b'], $item->toArray());
     }
 
-    public function testConstructorWithNull(): void
+    public function test_constructor_with_null(): void
     {
         $item = new Item(null);
 
         $this->assertSame([], $item->toArray());
     }
 
-    public function testConstructorWithEmptyString(): void
+    public function test_constructor_with_empty_string(): void
     {
         $item = new Item('');
 
         $this->assertSame([], $item->toArray());
     }
 
-    public function testConstructorWithStdClass(): void
+    public function test_constructor_with_std_class(): void
     {
         $item = new Item((object) ['a' => 'b']);
 
         $this->assertSame(['a' => 'b'], $item->toArray());
     }
 
-    public function testConstructorWithNestedArray(): void
+    public function test_constructor_with_nested_array(): void
     {
         $item = new Item(['a' => ['b' => 'c']]);
 
@@ -58,7 +58,7 @@ class ItemTest extends TestCase
 
     // Test para validar todos los metodos de la clase \Joalvm\Item.
 
-    public function testOffsetExists(): void
+    public function test_offset_exists(): void
     {
         $item = new Item(['a' => 'b']);
 
@@ -66,7 +66,7 @@ class ItemTest extends TestCase
         $this->assertFalse($item->offsetExists('b'));
     }
 
-    public function testOffsetGet(): void
+    public function test_offset_get(): void
     {
         $item = new Item(['a' => 'b']);
 
@@ -74,7 +74,7 @@ class ItemTest extends TestCase
         $this->assertNull($item->offsetGet('b'));
     }
 
-    public function testOffsetSet(): void
+    public function test_offset_set(): void
     {
         $item = new Item(['a' => 'b']);
 
@@ -85,7 +85,7 @@ class ItemTest extends TestCase
         $this->assertSame('d', $item->offsetGet('b'));
     }
 
-    public function testOffsetUnset(): void
+    public function test_offset_unset(): void
     {
         $item = new Item(['a' => 'b']);
 
@@ -94,7 +94,7 @@ class ItemTest extends TestCase
         $this->assertNull($item->offsetGet('a'));
     }
 
-    public function testGet(): void
+    public function test_get(): void
     {
         $item = new Item(['a' => 'b']);
 
@@ -102,7 +102,7 @@ class ItemTest extends TestCase
         $this->assertNull($item->get('b'));
     }
 
-    public function testGetWithNestedArray(): void
+    public function test_get_with_nested_array(): void
     {
         $item = new Item(['a' => ['b' => 'c']]);
 
@@ -111,7 +111,7 @@ class ItemTest extends TestCase
         $this->assertNull($item->get('a.c'));
     }
 
-    public function testGetWithNestedArrayAndDefault(): void
+    public function test_get_with_nested_array_and_default(): void
     {
         $item = new Item(['a' => ['b' => 'c']]);
 
@@ -119,7 +119,7 @@ class ItemTest extends TestCase
         $this->assertSame('d', $item->get('a.c', 'd'));
     }
 
-    public function testGetWithNestedArrayAndDefaultNull(): void
+    public function test_get_with_nested_array_and_default_null(): void
     {
         $item = new Item(['a' => ['b' => 'c']]);
 
@@ -127,7 +127,7 @@ class ItemTest extends TestCase
         $this->assertNull($item->get('a.c'));
     }
 
-    public function testSet(): void
+    public function test_set(): void
     {
         $item = new Item(['a' => 'b']);
 
@@ -138,7 +138,7 @@ class ItemTest extends TestCase
         $this->assertSame('d', $item->get('b'));
     }
 
-    public function testSetWithNestedArray(): void
+    public function test_set_with_nested_array(): void
     {
         $item = new Item(['a' => ['b' => 'c']]);
 
@@ -147,7 +147,7 @@ class ItemTest extends TestCase
         $this->assertSame('d', $item->get('a.b'));
     }
 
-    public function testSetWithNestedArrayAndEmptyArray(): void
+    public function test_set_with_nested_array_and_empty_array(): void
     {
         $item = new Item(['a' => []]);
 
@@ -156,7 +156,7 @@ class ItemTest extends TestCase
         $this->assertSame(['b' => 'd'], $item->get('a'));
     }
 
-    public function testSetWithNestedArrayAndEmptyArrayAndEmptyKey(): void
+    public function test_set_with_nested_array_and_empty_array_and_empty_key(): void
     {
         $item = new Item(['a' => []]);
 
@@ -165,28 +165,28 @@ class ItemTest extends TestCase
         $this->assertSame('d', $item->get('a'));
     }
 
-    public function testCount(): void
+    public function test_count(): void
     {
         $item = new Item(['a' => 'b']);
 
         $this->assertSame(1, $item->count());
     }
 
-    public function testCountWithNestedArray(): void
+    public function test_count_with_nested_array(): void
     {
         $item = new Item(['a' => ['b' => 'c']]);
 
         $this->assertSame(1, $item->count());
     }
 
-    public function testSchematize(): void
+    public function test_schematize(): void
     {
         $item = new Item(['a.b' => 'c']);
 
         $this->assertSame(['a' => ['b' => 'c']], $item->schematize()->toArray());
     }
 
-    public function testSchematizeWithCast(): void
+    public function test_schematize_with_cast(): void
     {
         $item = new Item(['a.b' => 3.59]);
 

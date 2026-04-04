@@ -15,7 +15,7 @@ class CollectionTest extends TestCase
 {
     // Genera todos los test para la clase Joalvm\Utils\Collection.
 
-    public function testConstructor(): void
+    public function test_constructor(): void
     {
         $collection = new Collection(
             collect([(object) ['a.b' => 'c']]),

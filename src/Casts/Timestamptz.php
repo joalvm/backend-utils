@@ -3,10 +3,11 @@
 namespace Joalvm\Utils\Casts;
 
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
 
-class TimestamptzCast implements CastsAttributes
+class Timestamptz implements CastsAttributes
 {
     /**
      * Cast the given value.
@@ -20,10 +21,10 @@ class TimestamptzCast implements CastsAttributes
         }
 
         if (is_numeric($value)) {
-            return Carbon::createFromTimestamp($value);
+            return CarbonImmutable::createFromTimestamp($value);
         }
 
-        return Carbon::parse($this->normalizeStrDateTime($value))->toImmutable();
+        return CarbonImmutable::parse($this->normalizeStrDateTime($value))->toImmutable();
     }
 
     /**

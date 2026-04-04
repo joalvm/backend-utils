@@ -12,7 +12,7 @@ class UnprocessableEntityException extends HttpException
     public function __construct(
         array $errors = [],
         ?string $message = null,
-        \Throwable $previous = null,
+        ?\Throwable $previous = null,
         array $headers = [],
         mixed $code = 0
     ) {

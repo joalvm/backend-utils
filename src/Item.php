@@ -2,32 +2,64 @@
 
 namespace Joalvm\Utils;
 
-use Illuminate\Contracts\Support\Arrayable;
-use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Fluent;
 
+/**
+ * Representa un objeto dentro de una colección con funcionalidades adicionales
+ * para manipulación de datos, casteo de tipos y serialización.
+ *
+ * Esta clase extiende Fluent para proporcionar métodos específicos de casteo
+ * y manipulación de datos, manteniendo la compatibilidad con arrays y JSON.
+ *
+ * @template TKey of array-key
+ * @template TValue
+ *
+ * @extends \Illuminate\Support\Fluent<TKey, TValue>
+ *
+ * @implements \Stringable
+ * @implements \Countable
+ */
 class Item extends Fluent implements \Stringable, \Countable
 {
-    public function __toString()
+    /**
+     * Convierte la instancia a string usando representación JSON.
+     *
+     * @return string
+     */
+    public function __toString(): string
     {
         return $this->toJson(JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
+    /**
+     * Crea una nueva instancia de Item.
+     *
+     * @param iterable<TKey, TValue> $attributes
+     *
+     * @return static
+     */
     public static function make($attributes = []): self
     {
         return new static($attributes);
     }
 
+    /**
+     * Cuenta el número de atributos en la instancia.
+     *
+     * @return int
+     */
     public function count(): int
     {
         return count(array_keys($this->attributes));
     }
 
     /**
-     * Elimina un atributo de la instancia Item.
+     * Elimina uno o más atributos de la instancia Item.
      *
-     * @param TKey|array<TKey> $keys
+     * @param array<TKey>|TKey ...$keys Las claves a eliminar
+     *
+     * @return void
      */
     public function forget(...$keys): void
     {
@@ -35,9 +67,16 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Estructurar la consulta.
+     * Estructura y reorganiza los datos aplicando transformaciones opcionales.
+     *
+     * Este método reconstruye los atributos y opcionalmente aplica una función
+     * de casteo personalizada para transformar los valores.
+     *
+     * @param callable|null $fnCasts Función opcional para castear valores
+     *
+     * @return self
      */
-    public function schematize(callable $fnCasts = null): self
+    public function schematize(?callable $fnCasts = null): self
     {
         /** @var array|\stdClass */
         $origin = $this->attributes;
@@ -66,7 +105,12 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Permite pasar una funcion para casteo custom.
+     * Aplica una función de casteo personalizada a las claves especificadas.
+     *
+     * @param callable      $fn   Función que recibe el valor y retorna el valor transformado
+     * @param array<string> $keys Lista de claves a procesar
+     *
+     * @return void
      */
     public function cast(callable $fn, array $keys): void
     {
@@ -78,9 +122,11 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Castea todos las keys a valores enteros.
+     * Castea los valores de las claves especificadas a enteros.
      *
-     * @param string[] $keys
+     * @param array<string> $keys Lista de claves a castear
+     *
+     * @return void
      */
     public function castIntValues(array $keys): void
     {
@@ -94,7 +140,11 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Alias de castIntValues.
+     * Alias para castIntValues().
+     *
+     * @param array<string> $keys Lista de claves a castear
+     *
+     * @return void
      */
     public function intValues(array $keys): void
     {
@@ -102,9 +152,13 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Castea todos las keys a valores flotantes.
+     * Castea los valores de las claves especificadas a números flotantes.
      *
-     * @param string[] $keys lista de keys a castear a float
+     * @param array<string> $keys      Lista de claves a castear
+     * @param int           $precision Número de decimales (-1 para no redondear)
+     * @param int           $mode      Modo de redondeo (PHP_ROUND_*)
+     *
+     * @return void
      */
     public function castFloatValues(
         array $keys,
@@ -121,7 +175,13 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Alias de castFloatValues.
+     * Alias para castFloatValues().
+     *
+     * @param array<string> $keys      Lista de claves a castear
+     * @param int           $precision Número de decimales
+     * @param int           $mode      Modo de redondeo
+     *
+     * @return void
      */
     public function floatValues(array $keys, int $precision = -1, int $mode = PHP_ROUND_HALF_UP): void
     {
@@ -129,9 +189,11 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Castea todos las keys a valores boleanos.
+     * Castea los valores de las claves especificadas a booleanos.
      *
-     * @param string[] $keys
+     * @param array<string> $keys Lista de claves a castear
+     *
+     * @return void
      */
     public function castBoolValues(array $keys): void
     {
@@ -145,7 +207,11 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Alias de castBoolValues.
+     * Alias para castBoolValues().
+     *
+     * @param array<string> $keys Lista de claves a castear
+     *
+     * @return void
      */
     public function boolValues(array $keys): void
     {
@@ -153,11 +219,13 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Castea todos las keys de un json a array asociativos.
+     * Castea los valores de las claves especificadas desde JSON a arrays/objetos.
      *
-     * @param string[] $keys
+     * @param array<string> $keys Lista de claves a castear
+     *
+     * @return void
      */
-    public function castJsonValues(array $keys)
+    public function castJsonValues(array $keys): void
     {
         foreach ($keys as $key) {
             if (!$this->has($key)) {
@@ -177,7 +245,11 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Alias de castJsonValues.
+     * Alias para castJsonValues().
+     *
+     * @param array<string> $keys Lista de claves a castear
+     *
+     * @return void
      */
     public function jsonValues(array $keys): void
     {
@@ -185,96 +257,34 @@ class Item extends Fluent implements \Stringable, \Countable
     }
 
     /**
-     * Retorna la lista de keys de la instancia Item.
+     * Retorna todas las claves de la instancia usando notación punto.
+     *
+     * @return array<string>
      */
     public function keys(): array
     {
         return array_keys(Arr::dot($this->attributes));
     }
 
-    public function get($key, $default = null)
-    {
-        if (Arr::has($this->attributes, $key)) {
-            return Arr::get($this->attributes, $key);
-        }
-
-        return value($default);
-    }
-
     /**
-     * Actualiza o agrega un atributo a la instancia Item.
+     * Verifica si la instancia está vacía (sin atributos).
      *
-     * @param mixed $value
+     * @return bool
      */
-    public function set(string $key, $value): self
-    {
-        Arr::set($this->attributes, $key, $value);
-
-        return $this;
-    }
-
-    public function has(string $key): bool
-    {
-        return Arr::has($this->attributes, $key);
-    }
-
     public function isEmpty(): bool
     {
         return empty(array_keys((array) $this->attributes));
     }
 
     /**
-     * Obtiene los atributos de la instancia Item.
+     * Analiza recursivamente los datos para limpiar valores nulos anidados.
      *
-     * @return array
-     */
-    public function getAttributes()
-    {
-        return $this->attributes;
-    }
-
-    /**
-     * Convierte la instancia Item en un array asociativo.
+     * Si todos los valores de un array/objeto son null, convierte todo el
+     * contenedor en null.
      *
-     * @return array
-     */
-    public function toArray()
-    {
-        return $this->attributes;
-    }
-
-    /**
-     * Convierte la instancia Item en un JSON.
+     * @param array<mixed>|\stdClass $data Datos a limpiar
      *
-     * @param int $options
-     *
-     * @return string
-     */
-    public function toJson($options = 0)
-    {
-        return json_encode($this->jsonSerialize(), $options);
-    }
-
-    public function offsetExists($offset): bool
-    {
-        return $this->has($offset);
-    }
-
-    public function offsetSet($offset, $value): void
-    {
-        Arr::set($this->attributes, $offset, $value);
-    }
-
-    public function offsetUnset($offset): void
-    {
-        Arr::forget($this->attributes, $offset);
-    }
-
-    /**
-     * Analiza todos los objetos asociativos en busca de nulls
-     * en caso de hallar todos los valores null, convierte el array en null.
-     *
-     * @param array|\stdClass $data
+     * @return array<mixed>|\stdClass|null
      */
     private function cleanSchematizedValues($data)
     {

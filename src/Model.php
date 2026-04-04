@@ -5,6 +5,9 @@ namespace Joalvm\Utils;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
 use Joalvm\Utils\Traits\ValidatesAttributes;
 
+/**
+ * {@inheritDoc}
+ */
 class Model extends EloquentModel
 {
     use ValidatesAttributes;

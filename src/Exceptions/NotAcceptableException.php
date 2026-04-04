@@ -8,7 +8,7 @@ class NotAcceptableException extends HttpException
 {
     public function __construct(
         $message = null,
-        \Throwable $previous = null,
+        ?\Throwable $previous = null,
         array $headers = [],
         $code = 0
     ) {

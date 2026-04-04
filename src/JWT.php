@@ -32,7 +32,7 @@ class JWT
      * Crea un JWT token pudiendo personalizar la fecha de expiración,
      * el valor retornado es un array[string $token, Carbon $expire].
      *
-     * @return array<int,\Illuminate\Support\Carbon|string>
+     * @return array<int,Carbon|string>
      */
     public static function encode(array $payload, int $expireMinutes = 4320): array
     {

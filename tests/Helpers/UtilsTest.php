@@ -13,21 +13,21 @@ use PHPUnit\Framework\TestCase;
  */
 class UtilsTest extends TestCase
 {
-    public function testIsArrayAssoc(): void
+    public function test_is_array_assoc(): void
     {
         $this->assertTrue(is_array_assoc(['a' => 'b']));
         $this->assertFalse(is_array_assoc(['a', 'b']));
         $this->assertFalse(is_array_assoc('wrong value'));
     }
 
-    public function testIsArrayList(): void
+    public function test_is_array_list(): void
     {
         $this->assertTrue(is_array_list(['a', 'b']));
         $this->assertFalse(is_array_list(['a' => 'b']));
         $this->assertFalse(is_array_list('wrong value'));
     }
 
-    public function testFormatBytes(): void
+    public function test_format_bytes(): void
     {
         $this->assertEquals('0 B', format_bytes(0));
         $this->assertEquals('1 B', format_bytes(1));
@@ -37,7 +37,7 @@ class UtilsTest extends TestCase
         $this->assertEquals('1 TB', format_bytes(1024 * 1024 * 1024 * 1024));
     }
 
-    public function testDot(): void
+    public function test_dot(): void
     {
         $this->assertEquals(['a.b.c' => 'd'], dot(['a' => ['b' => ['c' => 'd']]]));
     }
